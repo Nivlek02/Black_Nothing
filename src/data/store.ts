@@ -53,6 +53,7 @@ export const savePayment = (payment: PaymentRecord): void => {
   all.unshift(payment);
   set(KEYS.payments, all);
 };
+export const deletePayment = (id: string): void => set(KEYS.payments, getPayments().filter(p => p.id !== id));
 
 // Config
 export const getConfig = (): AppConfig => get(KEYS.config, { reminderDays: [7, 1] });
