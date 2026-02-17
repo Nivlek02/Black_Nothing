@@ -1,18 +1,24 @@
 import { useState, useMemo } from 'react';
+import { Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getPayments, getPlatforms, formatCurrency } from '@/data/store';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { getPayments, getPlatforms, formatCurrency, deletePayment } from '@/data/store';
 import { PaymentRecord } from '@/data/models';
+import { useToast } from '@/hooks/use-toast';
 
 export default function HistoryPage() {
-  const [payments] = useState<PaymentRecord[]>(() => getPayments());
+  const { toast } = useToast();
+  const [payments, setPayments] = useState<PaymentRecord[]>(() => getPayments());
   const platforms = useMemo(() => getPlatforms(), []);
   const [filterPlatform, setFilterPlatform] = useState('all');
   const [filterCurrency, setFilterCurrency] = useState('all');
   const [search, setSearch] = useState('');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return payments.filter(p => {
@@ -25,6 +31,14 @@ export default function HistoryPage() {
 
   const totalUSD = filtered.filter(p => p.currency === 'USD').reduce((s, p) => s + p.amount, 0);
   const totalCOP = filtered.filter(p => p.currency === 'COP').reduce((s, p) => s + p.amount, 0);
+
+  const handleDelete = () => {
+    if (!deleteId) return;
+    deletePayment(deleteId);
+    setPayments(getPayments());
+    setDeleteId(null);
+    toast({ title: 'Pago eliminado' });
+  };
 
   return (
     <div className="space-y-6">
@@ -75,6 +89,7 @@ export default function HistoryPage() {
                 <TableHead className="text-muted-foreground hidden sm:table-cell">Periodo</TableHead>
                 <TableHead className="text-muted-foreground">Monto</TableHead>
                 <TableHead className="text-muted-foreground hidden md:table-cell">Comentario</TableHead>
+                <TableHead className="text-muted-foreground text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -87,17 +102,36 @@ export default function HistoryPage() {
                     <Badge variant="outline" className="font-mono-data bg-secondary/50">{formatCurrency(p.amount, p.currency)}</Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm hidden md:table-cell">{p.comment || '—'}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(p.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No se encontraron pagos</TableCell>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No se encontraron pagos</TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
       </Card>
+
+      {/* Delete Confirm */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar pago?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción eliminará el registro de pago del histórico. No se puede deshacer.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
