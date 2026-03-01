@@ -93,3 +93,36 @@ export const FREQUENCY_LABELS: Record<Frequency, string> = {
 
 export const CATEGORIES = ['CRM', 'Email', 'Hosting', 'Ads', 'Productividad', 'Diseño', 'Dominios', 'Comunicación', 'Almacenamiento', 'Otro'];
 export const CURRENCIES = ['USD', 'COP', 'EUR', 'MXN'];
+
+// UNAD Models
+export interface Subject {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface Activity {
+  id: string;
+  subjectId: string;
+  name: string;
+  startDate: string;
+  dueDate: string;
+  status: ActivityStatus;
+  notes: string;
+  checklist: ChecklistItem[];
+  createdAt: string;
+}
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+export type ActivityStatus = 'pending' | 'in-progress' | 'completed';
+
+export const ACTIVITY_STATUS_LABELS: Record<ActivityStatus, string> = {
+  pending: 'Pendiente',
+  'in-progress': 'En progreso',
+  completed: 'Completada',
+};

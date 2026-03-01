@@ -10,6 +10,7 @@ import HomePage from "./pages/Index";
 import ReportsPage from "./pages/Reports";
 import ReportDetailPage from "./pages/ReportDetail";
 import BillingPage from "./pages/Billing";
+import UnadPage from "./pages/Unad";
 import HistoryPage from "./pages/History";
 import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -31,6 +32,7 @@ const App = () => {
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/reports/:id" element={<ReportDetailPage />} />
               <Route path="/billing" element={<BillingPage />} />
+              <Route path="/unad" element={<UnadPage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<NotFound />} />

@@ -1,10 +1,12 @@
-import { Report, Task, Platform, PaymentRecord, AppConfig } from './models';
+import { Report, Task, Platform, PaymentRecord, AppConfig, Subject, Activity } from './models';
 
 const KEYS = {
   reports: 'cdc-reports',
   platforms: 'cdc-platforms',
   payments: 'cdc-payments',
   config: 'cdc-config',
+  subjects: 'cdc-subjects',
+  activities: 'cdc-activities',
   initialized: 'cdc-init',
 };
 
@@ -58,6 +60,31 @@ export const deletePayment = (id: string): void => set(KEYS.payments, getPayment
 // Config
 export const getConfig = (): AppConfig => get(KEYS.config, { reminderDays: [7, 1] });
 export const saveConfig = (config: AppConfig): void => set(KEYS.config, config);
+
+// Subjects
+export const getSubjects = (): Subject[] => get(KEYS.subjects, []);
+export const getSubject = (id: string): Subject | undefined => getSubjects().find(s => s.id === id);
+export const saveSubject = (subject: Subject): void => {
+  const all = getSubjects();
+  const idx = all.findIndex(s => s.id === subject.id);
+  if (idx >= 0) all[idx] = subject; else all.unshift(subject);
+  set(KEYS.subjects, all);
+};
+export const deleteSubject = (id: string): void => {
+  set(KEYS.subjects, getSubjects().filter(s => s.id !== id));
+  set(KEYS.activities, getActivities().filter(a => a.subjectId !== id));
+};
+
+// Activities
+export const getActivities = (): Activity[] => get(KEYS.activities, []);
+export const getActivitiesBySubject = (subjectId: string): Activity[] => getActivities().filter(a => a.subjectId === subjectId);
+export const saveActivity = (activity: Activity): void => {
+  const all = getActivities();
+  const idx = all.findIndex(a => a.id === activity.id);
+  if (idx >= 0) all[idx] = activity; else all.unshift(activity);
+  set(KEYS.activities, all);
+};
+export const deleteActivity = (id: string): void => set(KEYS.activities, getActivities().filter(a => a.id !== id));
 
 // Utils
 export function calculateNextCharge(billingDay: number, frequency: 'monthly' | 'annual'): string {
