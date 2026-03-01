@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Anchor, LayoutDashboard, ClipboardList, CreditCard, History, Settings, Menu, X, Search } from 'lucide-react';
+import { Anchor, LayoutDashboard, ClipboardList, CreditCard, History, Settings, Menu, X, Search, BookOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 const navItems = [
   { label: 'Inicio', path: '/', icon: LayoutDashboard },
   { label: 'Informes Quincenales', path: '/reports', icon: ClipboardList },
   { label: 'Facturación', path: '/billing', icon: CreditCard },
+  { label: 'UNAD', path: '/unad', icon: BookOpen },
   { label: 'Histórico', path: '/history', icon: History },
   { label: 'Configuración', path: '/settings', icon: Settings },
 ];
