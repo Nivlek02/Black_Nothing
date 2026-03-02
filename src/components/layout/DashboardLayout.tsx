@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 
 const navItems = [
   { label: 'Inicio', path: '/', icon: LayoutDashboard },
-  { label: 'Informes Quincenales', path: '/reports', icon: ClipboardList },
+  { label: 'Reporte SIS', path: '/reports', icon: ClipboardList },
   { label: 'Facturación', path: '/billing', icon: CreditCard },
   { label: 'UNAD', path: '/unad', icon: BookOpen },
   { label: 'Histórico', path: '/history', icon: History },

@@ -1,25 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Pencil, Copy, FileDown, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Copy, FileDown, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Report, Task, ReportStatus, TaskStatus, TaskPriority, REPORT_STATUS_LABELS, TASK_STATUS_LABELS, TASK_PRIORITY_LABELS } from '@/data/models';
+import { Report, Task, ReportStatus, TaskPriority, REPORT_STATUS_LABELS, TASK_STATUS_LABELS } from '@/data/models';
 import { getReport, saveReport, generateId } from '@/data/store';
-import { reportStatusStyle, taskStatusStyle, priorityStyle } from '@/lib/statusStyles';
+import { reportStatusStyle, priorityStyle } from '@/lib/statusStyles';
 import { useToast } from '@/hooks/use-toast';
-
-const emptyTask: Omit<Task, 'id'> = {
-  title: '', description: '', project: '', priority: 'medium', status: 'pending',
-  startDate: '', endDate: '', evidence: '', notes: '',
-};
 
 export default function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,8 +22,9 @@ export default function ReportDetailPage() {
   const { toast } = useToast();
   const [report, setReport] = useState<Report | null>(null);
   const [taskOpen, setTaskOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [taskForm, setTaskForm] = useState(emptyTask);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskPriority, setTaskPriority] = useState<TaskPriority>('medium');
+  const [taskDate, setTaskDate] = useState('');
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,40 +42,42 @@ export default function ReportDetailPage() {
 
   const handleSave = () => {
     persist(report);
-    toast({ title: 'Informe guardado' });
+    toast({ title: 'Reporte guardado' });
   };
 
   const handleCopy = () => {
-    const text = `${report.title}\nPeriodo: ${report.startDate} - ${report.endDate}\nResponsable: ${report.responsible}\nEstado: ${REPORT_STATUS_LABELS[report.status]}\n\nResumen:\n${report.summary}\n\nTareas:\n${report.tasks.map((t, i) => `${i + 1}. [${TASK_STATUS_LABELS[t.status]}] ${t.title} - ${t.description}`).join('\n')}`;
+    const text = `${report.title}\nPeriodo: ${report.startDate} - ${report.endDate}\nEstado: ${REPORT_STATUS_LABELS[report.status]}\n\nTareas:\n${report.tasks.map((t, i) => `${t.status === 'done' ? '✅' : '⬜'} ${t.title} (${t.startDate || 'sin fecha'})`).join('\n')}`;
     navigator.clipboard.writeText(text);
     toast({ title: 'Copiado al portapapeles' });
   };
 
-  const openTaskForm = (task?: Task) => {
-    if (task) {
-      setEditingTask(task);
-      setTaskForm({ ...task });
-    } else {
-      setEditingTask(null);
-      setTaskForm({ ...emptyTask });
-    }
-    setTaskOpen(true);
+  const toggleTask = (taskId: string) => {
+    const tasks = report.tasks.map(t =>
+      t.id === taskId ? { ...t, status: (t.status === 'done' ? 'pending' : 'done') as any } : t
+    );
+    persist({ ...report, tasks });
   };
 
-  const handleSaveTask = () => {
-    if (!taskForm.title.trim()) {
+  const handleAddTask = () => {
+    if (!taskTitle.trim()) {
       toast({ title: 'Error', description: 'El título es obligatorio', variant: 'destructive' });
       return;
     }
-    let tasks: Task[];
-    if (editingTask) {
-      tasks = report.tasks.map(t => t.id === editingTask.id ? { ...taskForm, id: editingTask.id } as Task : t);
-    } else {
-      tasks = [...report.tasks, { ...taskForm, id: generateId() } as Task];
-    }
-    persist({ ...report, tasks });
+    const newTask: Task = {
+      id: generateId(),
+      title: taskTitle.trim(),
+      description: '',
+      project: '',
+      priority: taskPriority,
+      status: 'pending',
+      startDate: taskDate || undefined,
+    };
+    persist({ ...report, tasks: [...report.tasks, newTask] });
     setTaskOpen(false);
-    toast({ title: editingTask ? 'Tarea actualizada' : 'Tarea agregada' });
+    setTaskTitle('');
+    setTaskPriority('medium');
+    setTaskDate('');
+    toast({ title: 'Tarea agregada' });
   };
 
   const handleDeleteTask = () => {
@@ -89,10 +87,54 @@ export default function ReportDetailPage() {
     toast({ title: 'Tarea eliminada' });
   };
 
-  const tasksDone = report.tasks.filter(t => t.status === 'done').length;
+  // Split into two 15-day periods
+  const midDate = report.startDate.slice(0, 8) + '15';
+  const q1Tasks = report.tasks.filter(t => !t.startDate || t.startDate <= midDate).sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+  const q2Tasks = report.tasks.filter(t => t.startDate && t.startDate > midDate).sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+
+  const totalTasks = report.tasks.length;
+  const doneTasks = report.tasks.filter(t => t.status === 'done').length;
+  const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+  const TaskList = ({ tasks, label }: { tasks: Task[]; label: string }) => (
+    <Card className="card-metallic">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm text-muted-foreground">{label}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1">
+        {tasks.length === 0 && (
+          <p className="text-sm text-muted-foreground/60 py-4 text-center">Sin tareas en este periodo</p>
+        )}
+        {tasks.map(t => (
+          <div key={t.id} className={`flex items-center gap-3 p-2.5 rounded-lg border border-border/50 transition-colors ${t.status === 'done' ? 'bg-primary/5' : 'hover:bg-secondary/30'}`}>
+            <Checkbox
+              checked={t.status === 'done'}
+              onCheckedChange={() => toggleTask(t.id)}
+              className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+            />
+            <div className="flex-1 min-w-0">
+              <span className={`text-sm ${t.status === 'done' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                {t.title}
+              </span>
+              {t.startDate && (
+                <span className="ml-2 text-xs text-muted-foreground font-mono-data">{t.startDate}</span>
+              )}
+            </div>
+            <Badge variant="outline" className={`text-xs shrink-0 hidden sm:inline-flex ${priorityStyle(t.priority)}`}>
+              {t.priority === 'high' ? 'Alta' : t.priority === 'medium' ? 'Media' : 'Baja'}
+            </Badge>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTaskId(t.id)}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate('/reports')}>
@@ -116,20 +158,14 @@ export default function ReportDetailPage() {
         </div>
       </div>
 
-      {/* Report meta */}
+      {/* Meta */}
       <Card className="card-metallic">
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="text-xs text-muted-foreground">Responsable</label>
-              <Input value={report.responsible} onChange={e => setReport({ ...report, responsible: e.target.value })} className="mt-1 bg-secondary/50" />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
             <div>
               <label className="text-xs text-muted-foreground">Estado</label>
               <Select value={report.status} onValueChange={(v: ReportStatus) => setReport({ ...report, status: v })}>
-                <SelectTrigger className="mt-1 bg-secondary/50">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="mt-1 bg-secondary/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="draft">Borrador</SelectItem>
                   <SelectItem value="review">En revisión</SelectItem>
@@ -137,177 +173,64 @@ export default function ReportDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end">
+            <div>
+              <label className="text-xs text-muted-foreground">Progreso</label>
+              <div className="flex items-center gap-3 mt-2">
+                <Progress value={progress} className="flex-1 h-2" />
+                <span className="text-sm font-mono-data text-foreground">{doneTasks}/{totalTasks}</span>
+              </div>
+            </div>
+            <div className="flex items-end justify-end">
               <Badge variant="outline" className={`text-sm px-3 py-1 ${reportStatusStyle(report.status)}`}>
                 {REPORT_STATUS_LABELS[report.status]}
               </Badge>
-              <span className="ml-3 text-sm text-muted-foreground">{tasksDone}/{report.tasks.length} tareas completadas</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="summary">
-        <TabsList className="bg-card border border-border">
-          <TabsTrigger value="summary">Resumen</TabsTrigger>
-          <TabsTrigger value="tasks">Tareas ({report.tasks.length})</TabsTrigger>
-          <TabsTrigger value="comments">Comentarios</TabsTrigger>
-        </TabsList>
+      {/* Add task button */}
+      <div className="flex justify-end">
+        <Button onClick={() => setTaskOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" /> Agregar tarea
+        </Button>
+      </div>
 
-        <TabsContent value="summary" className="mt-4">
-          <Card className="card-metallic">
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">Resumen Ejecutivo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                value={report.summary}
-                onChange={e => setReport({ ...report, summary: e.target.value })}
-                placeholder="Escribe el resumen ejecutivo del periodo..."
-                className="bg-secondary/50 min-h-[200px]"
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
+      {/* Tasks by period */}
+      <TaskList tasks={q1Tasks} label={`Quincena 1 — ${report.startDate} al ${midDate}`} />
+      <TaskList tasks={q2Tasks} label={`Quincena 2 — ${report.startDate.slice(0, 8)}16 al ${report.endDate}`} />
 
-        <TabsContent value="tasks" className="mt-4 space-y-4">
-          <div className="flex justify-end">
-            <Button onClick={() => openTaskForm()} className="gap-2">
-              <Plus className="h-4 w-4" /> Agregar tarea
-            </Button>
-          </div>
-          <Card className="card-metallic overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="text-muted-foreground">Tarea</TableHead>
-                    <TableHead className="text-muted-foreground hidden md:table-cell">Proyecto</TableHead>
-                    <TableHead className="text-muted-foreground">Prioridad</TableHead>
-                    <TableHead className="text-muted-foreground">Estado</TableHead>
-                    <TableHead className="text-muted-foreground text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {report.tasks.map(t => (
-                    <TableRow key={t.id} className="border-border hover:bg-secondary/30">
-                      <TableCell>
-                        <div className="font-medium text-foreground">{t.title}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5 hidden sm:block">{t.description}</div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {t.project && <Badge variant="outline" className="text-xs bg-secondary/50">{t.project}</Badge>}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-xs ${priorityStyle(t.priority)}`}>
-                          {TASK_PRIORITY_LABELS[t.priority]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-xs ${taskStatusStyle(t.status)}`}>
-                          {TASK_STATUS_LABELS[t.status]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => openTaskForm(t)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTaskId(t.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {report.tasks.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        No hay tareas aún. Agrega la primera.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="comments" className="mt-4">
-          <Card className="card-metallic">
-            <CardContent className="p-8 text-center text-muted-foreground">
-              <p>Sección de comentarios próximamente.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Task Dialog */}
+      {/* Add Task Dialog */}
       <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
-        <DialogContent className="bg-card border-border max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border max-w-sm">
           <DialogHeader>
-            <DialogTitle>{editingTask ? 'Editar Tarea' : 'Nueva Tarea'}</DialogTitle>
+            <DialogTitle>Nueva Tarea</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">Título *</label>
-              <Input value={taskForm.title} onChange={e => setTaskForm({ ...taskForm, title: e.target.value })} className="bg-secondary/50" />
+              <Input value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="Nombre de la tarea" className="bg-secondary/50" />
             </div>
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Descripción</label>
-              <Textarea value={taskForm.description} onChange={e => setTaskForm({ ...taskForm, description: e.target.value })} className="bg-secondary/50" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Proyecto/Área</label>
-                <Input value={taskForm.project} onChange={e => setTaskForm({ ...taskForm, project: e.target.value })} className="bg-secondary/50" />
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Prioridad</label>
-                <Select value={taskForm.priority} onValueChange={(v: TaskPriority) => setTaskForm({ ...taskForm, priority: v })}>
-                  <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baja</SelectItem>
-                    <SelectItem value="medium">Media</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <label className="text-sm text-muted-foreground mb-1 block">Fecha</label>
+              <Input type="date" value={taskDate} onChange={e => setTaskDate(e.target.value)} className="bg-secondary/50" min={report.startDate} max={report.endDate} />
+              <p className="text-xs text-muted-foreground mt-1">La fecha determina en qué quincena aparece la tarea.</p>
             </div>
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Estado</label>
-              <Select value={taskForm.status} onValueChange={(v: TaskStatus) => setTaskForm({ ...taskForm, status: v })}>
+              <label className="text-sm text-muted-foreground mb-1 block">Prioridad</label>
+              <Select value={taskPriority} onValueChange={(v: TaskPriority) => setTaskPriority(v)}>
                 <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pending">Pendiente</SelectItem>
-                  <SelectItem value="in-progress">En progreso</SelectItem>
-                  <SelectItem value="blocked">Bloqueada</SelectItem>
-                  <SelectItem value="done">Hecha</SelectItem>
+                  <SelectItem value="low">Baja</SelectItem>
+                  <SelectItem value="medium">Media</SelectItem>
+                  <SelectItem value="high">Alta</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Fecha inicio</label>
-                <Input type="date" value={taskForm.startDate || ''} onChange={e => setTaskForm({ ...taskForm, startDate: e.target.value })} className="bg-secondary/50" />
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Fecha fin</label>
-                <Input type="date" value={taskForm.endDate || ''} onChange={e => setTaskForm({ ...taskForm, endDate: e.target.value })} className="bg-secondary/50" />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Evidencia (link)</label>
-              <Input value={taskForm.evidence || ''} onChange={e => setTaskForm({ ...taskForm, evidence: e.target.value })} placeholder="https://..." className="bg-secondary/50" />
-            </div>
-            <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Notas</label>
-              <Textarea value={taskForm.notes || ''} onChange={e => setTaskForm({ ...taskForm, notes: e.target.value })} className="bg-secondary/50" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTaskOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveTask}>{editingTask ? 'Actualizar' : 'Agregar'}</Button>
+            <Button onClick={handleAddTask}>Agregar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

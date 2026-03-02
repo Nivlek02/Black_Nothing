@@ -1,9 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, Copy, Trash2, Eye } from 'lucide-react';
+import { Plus, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,6 +14,21 @@ import { getReports, saveReport, deleteReport, generateId } from '@/data/store';
 import { reportStatusStyle } from '@/lib/statusStyles';
 import { useToast } from '@/hooks/use-toast';
 
+const MONTHS = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+function buildPeriodDates(year: number, month: number) {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return {
+    q1Start: `${year}-${String(month + 1).padStart(2, '0')}-01`,
+    q1End: `${year}-${String(month + 1).padStart(2, '0')}-15`,
+    q2Start: `${year}-${String(month + 1).padStart(2, '0')}-16`,
+    q2End: `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`,
+  };
+}
+
 export default function ReportsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -23,57 +37,48 @@ export default function ReportsPage() {
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [duplicateFrom, setDuplicateFrom] = useState<string>('none');
 
   // Create form
-  const [title, setTitle] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [responsible, setResponsible] = useState('');
-  const [summary, setSummary] = useState('');
+  const now = new Date();
+  const [selYear, setSelYear] = useState(now.getFullYear());
+  const [selMonth, setSelMonth] = useState(now.getMonth());
 
   const filtered = useMemo(() => {
-    return reports.filter(r => {
+    const sorted = [...reports].sort((a, b) => b.startDate.localeCompare(a.startDate));
+    return sorted.filter(r => {
       if (filterStatus !== 'all' && r.status !== filterStatus) return false;
-      if (search && !r.title.toLowerCase().includes(search.toLowerCase()) && !r.responsible.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search && !r.title.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
   }, [reports, filterStatus, search]);
 
-  const resetForm = () => {
-    setTitle('');
-    setStartDate('');
-    setEndDate('');
-    setResponsible('');
-    setSummary('');
-    setDuplicateFrom('none');
-  };
-
   const handleCreate = () => {
-    if (!title.trim() || !startDate || !endDate || !responsible.trim()) {
-      toast({ title: 'Error', description: 'Completa los campos obligatorios', variant: 'destructive' });
+    const { q1Start, q2End } = buildPeriodDates(selYear, selMonth);
+    const title = `Reporte SIS - ${MONTHS[selMonth]} ${selYear}`;
+
+    // Check duplicate
+    if (reports.some(r => r.title === title)) {
+      toast({ title: 'Error', description: 'Ya existe un reporte para ese mes', variant: 'destructive' });
       return;
     }
 
-    const dupReport = duplicateFrom !== 'none' ? reports.find(r => r.id === duplicateFrom) : null;
-    const now = new Date().toISOString();
+    const nowISO = new Date().toISOString();
     const newReport: Report = {
       id: generateId(),
-      title: title.trim(),
-      startDate,
-      endDate,
-      responsible: responsible.trim(),
+      title,
+      startDate: q1Start,
+      endDate: q2End,
+      responsible: '',
       status: 'draft',
-      summary: summary.trim(),
-      tasks: dupReport ? dupReport.tasks.map(t => ({ ...t, id: generateId(), status: 'pending' as const })) : [],
-      createdAt: now,
-      updatedAt: now,
+      summary: '',
+      tasks: [],
+      createdAt: nowISO,
+      updatedAt: nowISO,
     };
     saveReport(newReport);
     setReports(getReports());
     setCreateOpen(false);
-    resetForm();
-    toast({ title: 'Informe creado', description: dupReport ? `Se duplicaron ${newReport.tasks.length} tareas` : 'Informe quincenal creado correctamente' });
+    toast({ title: 'Reporte creado', description: title });
   };
 
   const handleDelete = () => {
@@ -81,18 +86,24 @@ export default function ReportsPage() {
     deleteReport(deleteId);
     setReports(getReports());
     setDeleteId(null);
-    toast({ title: 'Informe eliminado' });
+    toast({ title: 'Reporte eliminado' });
+  };
+
+  // Group by period label
+  const getPeriodLabel = (r: Report) => {
+    const d = new Date(r.startDate + 'T00:00:00');
+    return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Informes Quincenales</h1>
-          <p className="text-sm text-muted-foreground">{reports.length} informes registrados</p>
+          <h1 className="text-2xl font-bold text-foreground">Reporte SIS</h1>
+          <p className="text-sm text-muted-foreground">{reports.length} reportes registrados</p>
         </div>
-        <Button onClick={() => { resetForm(); setCreateOpen(true); }} className="gap-2">
-          <Plus className="h-4 w-4" /> Crear informe
+        <Button onClick={() => setCreateOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" /> Crear reporte mensual
         </Button>
       </div>
 
@@ -101,7 +112,7 @@ export default function ReportsPage() {
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <Input
-              placeholder="Buscar por título o responsable..."
+              placeholder="Buscar por título..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="flex-1 bg-secondary/50"
@@ -129,9 +140,7 @@ export default function ReportsPage() {
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="text-muted-foreground">Título</TableHead>
                 <TableHead className="text-muted-foreground hidden md:table-cell">Periodo</TableHead>
-                <TableHead className="text-muted-foreground hidden sm:table-cell">Responsable</TableHead>
                 <TableHead className="text-muted-foreground">Estado</TableHead>
-                <TableHead className="text-muted-foreground text-center hidden sm:table-cell">Tareas</TableHead>
                 <TableHead className="text-muted-foreground text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -142,13 +151,11 @@ export default function ReportsPage() {
                   <TableCell className="text-muted-foreground text-sm font-mono-data hidden md:table-cell">
                     {r.startDate} → {r.endDate}
                   </TableCell>
-                  <TableCell className="text-muted-foreground hidden sm:table-cell">{r.responsible}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={`text-xs ${reportStatusStyle(r.status)}`}>
                       {REPORT_STATUS_LABELS[r.status]}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-center font-mono-data hidden sm:table-cell">{r.tasks.length}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => navigate(`/reports/${r.id}`)}>
@@ -163,8 +170,8 @@ export default function ReportsPage() {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No se encontraron informes
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    No se encontraron reportes
                   </TableCell>
                 </TableRow>
               )}
@@ -175,53 +182,40 @@ export default function ReportsPage() {
 
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="bg-card border-border max-w-lg">
+        <DialogContent className="bg-card border-border max-w-sm">
           <DialogHeader>
-            <DialogTitle>Crear Informe Quincenal</DialogTitle>
+            <DialogTitle>Crear Reporte SIS Mensual</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Título *</label>
-              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ej: Informe Quincenal - Feb 16-28, 2026" className="bg-secondary/50" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Fecha inicio *</label>
-                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-secondary/50" />
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Fecha fin *</label>
-                <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-secondary/50" />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Responsable *</label>
-              <Input value={responsible} onChange={e => setResponsible(e.target.value)} placeholder="Nombre del responsable" className="bg-secondary/50" />
-            </div>
-            <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Resumen ejecutivo</label>
-              <Textarea value={summary} onChange={e => setSummary(e.target.value)} placeholder="Resumen del periodo..." className="bg-secondary/50 min-h-[80px]" />
-            </div>
-            <div>
-              <label className="text-sm text-muted-foreground mb-1 block flex items-center gap-2">
-                <Copy className="h-3.5 w-3.5" /> Duplicar tareas de informe anterior
-              </label>
-              <Select value={duplicateFrom} onValueChange={setDuplicateFrom}>
-                <SelectTrigger className="bg-secondary/50">
-                  <SelectValue placeholder="Ninguno" />
-                </SelectTrigger>
+              <label className="text-sm text-muted-foreground mb-1 block">Año</label>
+              <Select value={String(selYear)} onValueChange={v => setSelYear(Number(v))}>
+                <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No duplicar</SelectItem>
-                  {reports.map(r => (
-                    <SelectItem key={r.id} value={r.id}>{r.title}</SelectItem>
+                  {[2025, 2026, 2027].map(y => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Mes</label>
+              <Select value={String(selMonth)} onValueChange={v => setSelMonth(Number(v))}>
+                <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((m, i) => (
+                    <SelectItem key={i} value={String(i)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Se creará el reporte para <strong>{MONTHS[selMonth]} {selYear}</strong> dividido en dos quincenas (1-15 y 16-{new Date(selYear, selMonth + 1, 0).getDate()}).
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreate}>Crear informe</Button>
+            <Button onClick={handleCreate}>Crear reporte</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -230,8 +224,8 @@ export default function ReportsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar informe?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará el informe y todas sus tareas.</AlertDialogDescription>
+            <AlertDialogTitle>¿Eliminar reporte?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará el reporte y todas sus tareas.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
