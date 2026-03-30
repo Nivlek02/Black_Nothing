@@ -1,4 +1,5 @@
 import { Report, Task, Platform, PaymentRecord, AppConfig, Subject, Activity } from './models';
+import { initializeAgendaSampleData } from './agenda';
 
 const KEYS = {
   reports: 'cdc-reports',
