@@ -2,10 +2,9 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Anchor, ArrowRight, CalendarDays, Clock, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { getPlatforms, getPayments, daysUntil, formatCurrency } from '@/data/store';
-import { chargeAlertStyle } from '@/lib/statusStyles';
+import { getAgendaTasks } from '@/data/agenda';
 import { getAgendaTasks } from '@/data/agenda';
 
 export default function HomePage() {
