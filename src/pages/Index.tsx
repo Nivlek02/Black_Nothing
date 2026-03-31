@@ -2,34 +2,18 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Anchor, ArrowRight, CalendarDays, Clock, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { getAgendaTasks } from '@/data/agenda';
 import { getAgendaTasks } from '@/data/agenda';
 
 export default function HomePage() {
-  const platforms = useMemo(() => getPlatforms(), []);
-  const payments = useMemo(() => getPayments(), []);
   const agendaTasks = useMemo(() => getAgendaTasks(), []);
 
-  const activePlatforms = platforms.filter(p => p.status === 'active');
-  const monthlyTotal = activePlatforms
-    .filter(p => p.currency === 'USD' && p.frequency === 'monthly')
-    .reduce((sum, p) => sum + p.cost, 0);
-  const monthlyCOP = activePlatforms
-    .filter(p => p.currency === 'COP' && p.frequency === 'monthly')
-    .reduce((sum, p) => sum + p.cost, 0);
-
-  const upcomingCharges = activePlatforms
-    .map(p => ({ ...p, daysLeft: daysUntil(p.nextCharge) }))
-    .filter(p => p.daysLeft <= 7)
-    .sort((a, b) => a.daysLeft - b.daysLeft);
-
-  // Today's tasks
   const today = new Date().toISOString().split('T')[0];
   const todayTasks = agendaTasks
     .filter(t => t.date === today)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  const pendingCount = agendaTasks.filter(t => !t.completed).length;
 
   return (
     <div className="space-y-6">
@@ -65,50 +49,31 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        {/* Facturación */}
+        {/* Pending */}
         <Card className="card-metallic">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Facturación Mensual</CardTitle>
-            <CreditCard className="h-5 w-5 text-accent" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Tareas Pendientes</CardTitle>
+            <Clock className="h-5 w-5 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono-data text-foreground">
-              {formatCurrency(monthlyTotal, 'USD')}
-            </div>
-            {monthlyCOP > 0 && (
-              <div className="text-sm font-mono-data text-muted-foreground mt-1">
-                + {formatCurrency(monthlyCOP, 'COP')}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground mt-2">
-              {activePlatforms.length} plataformas activas
-            </p>
-            <Link to="/billing">
-              <Button variant="ghost" size="sm" className="mt-3 w-full text-accent hover:text-accent hover:bg-accent/10">
-                Ver facturación <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
+            <div className="text-2xl font-bold font-mono-data text-foreground">{pendingCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">tareas sin completar</p>
           </CardContent>
         </Card>
 
-        {/* Alertas */}
-        <Card className={`card-metallic ${upcomingCharges.length > 0 ? 'border-warning/30' : ''}`}>
+        {/* Calendar */}
+        <Card className="card-metallic">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Alertas</CardTitle>
-            <AlertTriangle className={`h-5 w-5 ${upcomingCharges.length > 0 ? 'text-warning' : 'text-muted-foreground'}`} />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Calendario</CardTitle>
+            <Calendar className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono-data text-foreground">{upcomingCharges.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Cobros próximos (7 días)</p>
-            {upcomingCharges.slice(0, 3).map(p => {
-              const alert = chargeAlertStyle(p.daysLeft);
-              return (
-                <div key={p.id} className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-foreground truncate mr-2">{p.name}</span>
-                  <Badge variant="outline" className={`text-xs shrink-0 ${alert.style}`}>{alert.label}</Badge>
-                </div>
-              );
-            })}
+            <p className="text-xs text-muted-foreground mt-1">Festivos y fechas especiales</p>
+            <Link to="/calendario">
+              <Button variant="ghost" size="sm" className="mt-3 w-full text-primary hover:text-primary hover:bg-primary/10">
+                Ver calendario <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
