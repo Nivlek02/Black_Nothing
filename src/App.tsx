@@ -8,8 +8,7 @@ import DashboardLayout from "./components/layout/DashboardLayout";
 import { initializeIfNeeded } from "./data/store";
 import HomePage from "./pages/Index";
 import AgendaPage from "./pages/Agenda";
-import BillingPage from "./pages/Billing";
-import SettingsPage from "./pages/Settings";
+import CalendarioPage from "./pages/Calendario";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,8 +26,7 @@ const App = () => {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/agenda" element={<AgendaPage />} />
-              <Route path="/billing" element={<BillingPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/calendario" element={<CalendarioPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </DashboardLayout>
