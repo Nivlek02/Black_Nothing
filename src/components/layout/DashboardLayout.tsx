@@ -86,15 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <Menu className="h-6 w-6" />
           </button>
-          <div className="flex-1 max-w-sm">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar..."
-                className="pl-10 h-9 bg-secondary/50 border-border text-sm"
-              />
-            </div>
-          </div>
+          <div className="flex-1" />
         </header>
 
         {/* Content */}
