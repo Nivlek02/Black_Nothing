@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Anchor, LayoutDashboard, CalendarDays, CreditCard, Settings, Menu, X, Search } from 'lucide-react';
+import { Anchor, LayoutDashboard, CalendarDays, Calendar, Menu, X, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 const navItems = [
   { label: 'Inicio', path: '/', icon: LayoutDashboard },
   { label: 'Agenda', path: '/agenda', icon: CalendarDays },
-  { label: 'Facturación', path: '/billing', icon: CreditCard },
-  { label: 'Configuración', path: '/settings', icon: Settings },
+  { label: 'Calendario', path: '/calendario', icon: Calendar },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
