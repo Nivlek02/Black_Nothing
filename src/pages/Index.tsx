@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { CreditCard, AlertTriangle, Anchor, ArrowRight, CalendarDays, Clock } from 'lucide-react';
+import { Anchor, ArrowRight, CalendarDays, Clock, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
