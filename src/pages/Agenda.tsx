@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2, Check, X } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,6 @@ import {
   createAgendaTask,
   getDayHours,
   TASK_COLORS,
-  initializeAgendaSampleData,
 } from '@/data/agenda';
 
 const DAYS_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -29,7 +28,7 @@ function fmt(d: Date): string { return d.toISOString().split('T')[0]; }
 function getWeekDays(date: Date): Date[] {
   const day = date.getDay();
   const start = new Date(date);
-  start.setDate(date.getDate() - day + 1); // Monday
+  start.setDate(date.getDate() - day + 1);
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
@@ -62,34 +61,40 @@ function dotColor(color: string): string {
 export default function AgendaPage() {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [tasks, setTasks] = useState<AgendaTask[]>([]);
+  const [weekTasks, setWeekTasks] = useState<Record<string, AgendaTask[]>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTask, setEditTask] = useState<AgendaTask | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Form state
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formStart, setFormStart] = useState('09:00');
   const [formEnd, setFormEnd] = useState('10:00');
   const [formColor, setFormColor] = useState('primary');
 
-  useEffect(() => { initializeAgendaSampleData(); }, []);
-
   const dateStr = fmt(selectedDate);
-  const tasks = useMemo(() => getTasksForDate(dateStr), [dateStr, refreshKey]);
   const weekDays = useMemo(() => getWeekDays(selectedDate), [dateStr]);
-  const hours = useMemo(() => getDayHours(), []);
 
-  const allTasks = useMemo(() => {
-    const all: Record<string, AgendaTask[]> = {};
-    weekDays.forEach(d => {
-      all[fmt(d)] = getTasksForDate(fmt(d));
-    });
-    return all;
-  }, [weekDays, refreshKey]);
+  const loadTasks = useCallback(async () => {
+    setLoading(true);
+    const dayTasks = await getTasksForDate(dateStr);
+    setTasks(dayTasks);
 
-  const refresh = () => setRefreshKey(k => k + 1);
+    const wt: Record<string, AgendaTask[]> = {};
+    await Promise.all(weekDays.map(async d => {
+      const ds = fmt(d);
+      wt[ds] = await getTasksForDate(ds);
+    }));
+    setWeekTasks(wt);
+    setLoading(false);
+  }, [dateStr, weekDays]);
+
+  useEffect(() => { loadTasks(); }, [loadTasks]);
+
+  const today = fmt(new Date());
+  const isToday = dateStr === today;
 
   const navigateDay = (delta: number) => {
     const d = new Date(selectedDate);
@@ -105,63 +110,42 @@ export default function AgendaPage() {
 
   const openCreate = () => {
     setEditTask(null);
-    setFormTitle('');
-    setFormDesc('');
-    setFormStart('09:00');
-    setFormEnd('10:00');
-    setFormColor('primary');
+    setFormTitle(''); setFormDesc(''); setFormStart('09:00'); setFormEnd('10:00'); setFormColor('primary');
     setDialogOpen(true);
   };
 
   const openEdit = (task: AgendaTask) => {
     setEditTask(task);
-    setFormTitle(task.title);
-    setFormDesc(task.description);
-    setFormStart(task.startTime);
-    setFormEnd(task.endTime);
-    setFormColor(task.color);
+    setFormTitle(task.title); setFormDesc(task.description); setFormStart(task.startTime); setFormEnd(task.endTime); setFormColor(task.color);
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formTitle.trim()) return;
-    if (editTask) {
-      saveAgendaTask({ ...editTask, title: formTitle, description: formDesc, startTime: formStart, endTime: formEnd, color: formColor });
-      toast({ title: 'Tarea actualizada' });
-    } else {
-      const task = createAgendaTask({ title: formTitle, description: formDesc, date: dateStr, startTime: formStart, endTime: formEnd, color: formColor });
-      saveAgendaTask(task);
-      toast({ title: 'Tarea creada' });
-    }
-    setDialogOpen(false);
-    refresh();
+    try {
+      if (editTask) {
+        await saveAgendaTask({ ...editTask, title: formTitle, description: formDesc, startTime: formStart, endTime: formEnd, color: formColor });
+        toast({ title: 'Tarea actualizada' });
+      } else {
+        await createAgendaTask({ title: formTitle, description: formDesc, date: dateStr, startTime: formStart, endTime: formEnd, color: formColor });
+        toast({ title: 'Tarea creada' });
+      }
+      setDialogOpen(false);
+      loadTasks();
+    } catch { toast({ title: 'Error al guardar', variant: 'destructive' }); }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteId) return;
-    deleteAgendaTask(deleteId);
+    await deleteAgendaTask(deleteId);
     setDeleteId(null);
     toast({ title: 'Tarea eliminada' });
-    refresh();
+    loadTasks();
   };
 
-  const toggleComplete = (task: AgendaTask) => {
-    saveAgendaTask({ ...task, completed: !task.completed });
-    refresh();
-  };
-
-  const today = fmt(new Date());
-  const isToday = dateStr === today;
-
-  // Calculate task position in the timeline
-  const getTaskPosition = (task: AgendaTask) => {
-    const [sh, sm] = task.startTime.split(':').map(Number);
-    const [eh, em] = task.endTime.split(':').map(Number);
-    const startMin = (sh - 6) * 60 + sm;
-    const endMin = (eh - 6) * 60 + em;
-    const top = Math.max(0, startMin);
-    const height = Math.max(30, endMin - startMin);
-    return { top, height };
+  const toggleComplete = async (task: AgendaTask) => {
+    await saveAgendaTask({ ...task, completed: !task.completed });
+    loadTasks();
   };
 
   return (
@@ -196,16 +180,14 @@ export default function AgendaPage() {
               const ds = fmt(d);
               const isSelected = ds === dateStr;
               const isTodayDay = ds === today;
-              const dayTasks = allTasks[ds] || [];
+              const dayTasks = weekTasks[ds] || [];
               return (
                 <button
                   key={ds}
                   onClick={() => setSelectedDate(d)}
                   className={`flex flex-col items-center py-2 px-1 rounded-lg transition-all text-center ${
-                    isSelected
-                      ? 'bg-primary/15 border border-primary/30'
-                      : isTodayDay
-                        ? 'bg-accent/10 border border-accent/20'
+                    isSelected ? 'bg-primary/15 border border-primary/30'
+                      : isTodayDay ? 'bg-accent/10 border border-accent/20'
                         : 'hover:bg-secondary/50'
                   }`}
                 >
@@ -241,20 +223,20 @@ export default function AgendaPage() {
           </Button>
         </div>
         {!isToday && (
-          <Button variant="outline" size="sm" onClick={() => setSelectedDate(new Date())}>
-            Hoy
-          </Button>
+          <Button variant="outline" size="sm" onClick={() => setSelectedDate(new Date())}>Hoy</Button>
         )}
       </div>
 
-      {/* Task list view */}
+      {/* Task list */}
       {tasks.length === 0 ? (
         <Card className="card-metallic">
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No hay tareas para este día</p>
-            <Button variant="outline" className="mt-4" onClick={openCreate}>
-              <Plus className="h-4 w-4 mr-2" /> Agregar tarea
-            </Button>
+            <p className="text-muted-foreground">{loading ? 'Cargando...' : 'No hay tareas para este día'}</p>
+            {!loading && (
+              <Button variant="outline" className="mt-4" onClick={openCreate}>
+                <Plus className="h-4 w-4 mr-2" /> Agregar tarea
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -264,23 +246,13 @@ export default function AgendaPage() {
               task.completed ? 'opacity-60 border-l-muted-foreground' : `border-l-${task.color === 'primary' ? 'primary' : task.color === 'accent' ? 'accent' : task.color === 'warning' ? 'warning' : task.color === 'destructive' ? 'destructive' : 'muted-foreground'}`
             }`}>
               <CardContent className="p-3 flex items-start gap-3">
-                <Checkbox
-                  checked={task.completed}
-                  onCheckedChange={() => toggleComplete(task)}
-                  className="mt-1 shrink-0"
-                />
+                <Checkbox checked={task.completed} onCheckedChange={() => toggleComplete(task)} className="mt-1 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-sm font-medium ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                      {task.title}
-                    </span>
-                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${colorClass(task.color)}`}>
-                      {task.startTime} – {task.endTime}
-                    </Badge>
+                    <span className={`text-sm font-medium ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{task.title}</span>
+                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${colorClass(task.color)}`}>{task.startTime} – {task.endTime}</Badge>
                   </div>
-                  {task.description && (
-                    <p className="text-xs text-muted-foreground mt-1 truncate">{task.description}</p>
-                  )}
+                  {task.description && <p className="text-xs text-muted-foreground mt-1 truncate">{task.description}</p>}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => openEdit(task)}>
@@ -324,9 +296,7 @@ export default function AgendaPage() {
             <div>
               <label className="text-sm text-muted-foreground">Color</label>
               <Select value={formColor} onValueChange={setFormColor}>
-                <SelectTrigger className="mt-1 bg-secondary/50">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="mt-1 bg-secondary/50"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {TASK_COLORS.map(c => (
                     <SelectItem key={c.value} value={c.value}>
@@ -342,9 +312,7 @@ export default function AgendaPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={!formTitle.trim()}>
-              {editTask ? 'Guardar' : 'Crear'}
-            </Button>
+            <Button onClick={handleSave} disabled={!formTitle.trim()}>{editTask ? 'Guardar' : 'Crear'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

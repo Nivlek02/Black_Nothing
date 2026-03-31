@@ -1,15 +1,14 @@
-import { useState, useMemo } from 'react';
-import { Calendar, Plus, Trash2, Star, PartyPopper } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Calendar, Plus, Trash2, Star, PartyPopper, Edit2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-// Colombian holidays (fixed & moveable for 2025/2026 — approximate)
 const COLOMBIAN_HOLIDAYS: { month: number; day: number; name: string }[] = [
   { month: 1, day: 1, name: 'Año Nuevo' },
   { month: 1, day: 6, name: 'Día de los Reyes Magos' },
@@ -32,12 +31,11 @@ const COLOMBIAN_HOLIDAYS: { month: number; day: number; name: string }[] = [
 
 interface SpecialDate {
   id: string;
-  date: string; // YYYY-MM-DD
+  date: string;
   name: string;
   color: string;
 }
 
-const STORAGE_KEY = 'cic_special_dates';
 const DATE_COLORS = [
   { label: 'Verde', value: 'primary' },
   { label: 'Azul', value: 'accent' },
@@ -45,14 +43,6 @@ const DATE_COLORS = [
   { label: 'Rojo', value: 'destructive' },
   { label: 'Gris', value: 'muted' },
 ];
-
-const colorMap: Record<string, string> = {
-  primary: 'bg-primary/20 text-primary border-primary/30',
-  accent: 'bg-accent/20 text-accent border-accent/30',
-  warning: 'bg-warning/20 text-warning border-warning/30',
-  destructive: 'bg-destructive/20 text-destructive border-destructive/30',
-  muted: 'bg-muted text-muted-foreground border-border',
-};
 
 const dotColorMap: Record<string, string> = {
   primary: 'bg-primary',
@@ -62,22 +52,7 @@ const dotColorMap: Record<string, string> = {
   muted: 'bg-muted-foreground',
 };
 
-function loadSpecialDates(): SpecialDate[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function saveSpecialDates(dates: SpecialDate[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(dates));
-}
-
-const MONTH_NAMES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-];
-
+const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAY_NAMES = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
 
 function getDaysInMonth(year: number, month: number) {
@@ -86,22 +61,32 @@ function getDaysInMonth(year: number, month: number) {
 
 function getFirstDayOfMonth(year: number, month: number) {
   const d = new Date(year, month, 1).getDay();
-  return d === 0 ? 6 : d - 1; // Monday = 0
+  return d === 0 ? 6 : d - 1;
 }
 
 export default function CalendarioPage() {
   const [year, setYear] = useState(new Date().getFullYear());
-  const [specialDates, setSpecialDates] = useState<SpecialDate[]>(loadSpecialDates);
+  const [specialDates, setSpecialDates] = useState<SpecialDate[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState('primary');
+  const [editingDate, setEditingDate] = useState<SpecialDate | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SpecialDate | null>(null);
   const { toast } = useToast();
 
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  // Index holidays by "MM-DD"
+  const loadDates = useCallback(async () => {
+    const { data, error } = await supabase.from('special_dates').select('*').order('date');
+    if (!error && data) {
+      setSpecialDates(data.map(r => ({ id: r.id, date: r.date, name: r.name, color: r.color })));
+    }
+  }, []);
+
+  useEffect(() => { loadDates(); }, [loadDates]);
+
   const holidayMap = useMemo(() => {
     const m = new Map<string, string>();
     COLOMBIAN_HOLIDAYS.forEach(h => {
@@ -110,7 +95,6 @@ export default function CalendarioPage() {
     return m;
   }, []);
 
-  // Index special dates by date string
   const specialMap = useMemo(() => {
     const m = new Map<string, SpecialDate[]>();
     specialDates.forEach(sd => {
@@ -122,32 +106,42 @@ export default function CalendarioPage() {
   }, [specialDates]);
 
   function openAddDialog(dateStr: string) {
+    setEditingDate(null);
     setSelectedDate(dateStr);
     setNewName('');
     setNewColor('primary');
     setDialogOpen(true);
   }
 
-  function handleAdd() {
-    if (!newName.trim()) return;
-    const nd: SpecialDate = {
-      id: Math.random().toString(36).slice(2, 10) + Date.now().toString(36),
-      date: selectedDate,
-      name: newName.trim(),
-      color: newColor,
-    };
-    const updated = [...specialDates, nd];
-    setSpecialDates(updated);
-    saveSpecialDates(updated);
-    setDialogOpen(false);
-    toast({ title: 'Fecha especial agregada' });
+  function openEditDialog(sd: SpecialDate) {
+    setEditingDate(sd);
+    setSelectedDate(sd.date);
+    setNewName(sd.name);
+    setNewColor(sd.color);
+    setDialogOpen(true);
   }
 
-  function handleDelete(id: string) {
-    const updated = specialDates.filter(s => s.id !== id);
-    setSpecialDates(updated);
-    saveSpecialDates(updated);
+  async function handleSave() {
+    if (!newName.trim()) return;
+    if (editingDate) {
+      const { error } = await supabase.from('special_dates').update({ name: newName.trim(), color: newColor }).eq('id', editingDate.id);
+      if (error) { toast({ title: 'Error al actualizar', variant: 'destructive' }); return; }
+      toast({ title: 'Fecha actualizada' });
+    } else {
+      const { error } = await supabase.from('special_dates').insert({ date: selectedDate, name: newName.trim(), color: newColor });
+      if (error) { toast({ title: 'Error al agregar', variant: 'destructive' }); return; }
+      toast({ title: 'Fecha especial agregada' });
+    }
+    setDialogOpen(false);
+    loadDates();
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    await supabase.from('special_dates').delete().eq('id', deleteTarget.id);
+    setDeleteTarget(null);
     toast({ title: 'Fecha eliminada' });
+    loadDates();
   }
 
   function renderMonth(monthIdx: number) {
@@ -155,7 +149,6 @@ export default function CalendarioPage() {
     const firstDay = getFirstDayOfMonth(year, monthIdx);
     const cells: React.ReactNode[] = [];
 
-    // Empty cells before first day
     for (let i = 0; i < firstDay; i++) {
       cells.push(<div key={`e-${i}`} className="h-8" />);
     }
@@ -182,7 +175,6 @@ export default function CalendarioPage() {
           title={holiday ? `🎉 ${holiday}` : specials.length > 0 ? specials.map(s => s.name).join(', ') : undefined}
         >
           {day}
-          {/* Dots for events */}
           {(holiday || specials.length > 0) && (
             <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5">
               {holiday && <span className="w-1 h-1 rounded-full bg-destructive" />}
@@ -204,33 +196,24 @@ export default function CalendarioPage() {
               <div key={d} className="text-center text-[10px] font-medium text-muted-foreground">{d}</div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-0.5">
-            {cells}
-          </div>
+          <div className="grid grid-cols-7 gap-0.5">{cells}</div>
         </CardContent>
       </Card>
     );
   }
 
-  // Upcoming events list
   const upcomingEvents = useMemo(() => {
-    const events: { date: string; name: string; type: 'holiday' | 'special'; color?: string; id?: string }[] = [];
-
-    // Add holidays for this year
+    const events: { date: string; name: string; type: 'holiday' | 'special'; color?: string; id?: string; sd?: SpecialDate }[] = [];
     COLOMBIAN_HOLIDAYS.forEach(h => {
       const dateStr = `${year}-${String(h.month).padStart(2, '0')}-${String(h.day).padStart(2, '0')}`;
       events.push({ date: dateStr, name: h.name, type: 'holiday' });
     });
-
-    // Add special dates for this year
     specialDates.filter(s => s.date.startsWith(`${year}-`)).forEach(s => {
-      events.push({ date: s.date, name: s.name, type: 'special', color: s.color, id: s.id });
+      events.push({ date: s.date, name: s.name, type: 'special', color: s.color, id: s.id, sd: s });
     });
-
     return events.sort((a, b) => a.date.localeCompare(b.date));
   }, [year, specialDates]);
 
-  // Filter to show upcoming from today or all for selected year
   const filteredEvents = useMemo(() => {
     if (year === today.getFullYear()) {
       return upcomingEvents.filter(e => e.date >= todayStr).slice(0, 12);
@@ -240,7 +223,6 @@ export default function CalendarioPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Calendar className="h-7 w-7 text-primary" />
@@ -258,16 +240,13 @@ export default function CalendarioPage() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-4">
-        {/* Calendar grid */}
         <div className="flex-1">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
             {Array.from({ length: 12 }, (_, i) => renderMonth(i))}
           </div>
         </div>
 
-        {/* Sidebar: upcoming events */}
         <div className="lg:w-72 shrink-0 space-y-3">
-          {/* Legend */}
           <Card className="card-metallic">
             <CardContent className="p-3">
               <h3 className="text-sm font-bold text-foreground mb-2">Leyenda</h3>
@@ -288,7 +267,6 @@ export default function CalendarioPage() {
             </CardContent>
           </Card>
 
-          {/* Upcoming */}
           <Card className="card-metallic">
             <CardContent className="p-3">
               <h3 className="text-sm font-bold text-foreground mb-2">
@@ -302,9 +280,7 @@ export default function CalendarioPage() {
                     const [, m, d] = ev.date.split('-');
                     return (
                       <div key={`${ev.date}-${i}`} className="flex items-start gap-2 group">
-                        <span className="text-[10px] font-mono-data text-muted-foreground mt-0.5 shrink-0 w-10">
-                          {d}/{m}
-                        </span>
+                        <span className="text-[10px] font-mono-data text-muted-foreground mt-0.5 shrink-0 w-10">{d}/{m}</span>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-foreground truncate">{ev.name}</p>
                         </div>
@@ -312,26 +288,12 @@ export default function CalendarioPage() {
                           <PartyPopper className="h-3 w-3 text-destructive shrink-0 mt-0.5" />
                         ) : (
                           <div className="flex items-center gap-1 shrink-0">
-                            <Star className="h-3 w-3 text-primary mt-0.5" />
-                            {ev.id && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <button className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Trash2 className="h-3 w-3 text-destructive" />
-                                  </button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Eliminar esta fecha?</AlertDialogTitle>
-                                    <AlertDialogDescription>Se eliminará "{ev.name}"</AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(ev.id!)}>Eliminar</AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
+                            <button className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => ev.sd && openEditDialog(ev.sd)}>
+                              <Edit2 className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                            </button>
+                            <button className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => ev.sd && setDeleteTarget(ev.sd)}>
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </button>
                           </div>
                         )}
                       </div>
@@ -344,26 +306,19 @@ export default function CalendarioPage() {
         </div>
       </div>
 
-      {/* Add special date dialog */}
+      {/* Add/Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Agregar fecha especial</DialogTitle>
+            <DialogTitle>{editingDate ? 'Editar fecha especial' : 'Agregar fecha especial'}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Fecha: <span className="font-mono-data font-semibold text-foreground">{selectedDate}</span>
           </p>
           <div className="space-y-3">
-            <Input
-              placeholder="Nombre del evento"
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            />
+            <Input placeholder="Nombre del evento" value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSave()} />
             <Select value={newColor} onValueChange={setNewColor}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {DATE_COLORS.map(c => (
                   <SelectItem key={c.value} value={c.value}>
@@ -378,10 +333,24 @@ export default function CalendarioPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleAdd} disabled={!newName.trim()}>Agregar</Button>
+            <Button onClick={handleSave} disabled={!newName.trim()}>{editingDate ? 'Guardar' : 'Agregar'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar esta fecha?</AlertDialogTitle>
+            <AlertDialogDescription>Se eliminará "{deleteTarget?.name}"</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

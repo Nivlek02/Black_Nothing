@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Anchor, LayoutDashboard, CalendarDays, Calendar, Menu, X, Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Anchor, LayoutDashboard, CalendarDays, Calendar, Menu, X } from 'lucide-react';
 
 const navItems = [
   { label: 'Inicio', path: '/', icon: LayoutDashboard },

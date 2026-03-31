@@ -1,3 +1,5 @@
+import { supabase } from '@/integrations/supabase/client';
+
 export interface AgendaTask {
   id: string;
   title: string;
@@ -5,50 +7,9 @@ export interface AgendaTask {
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm
   endTime: string; // HH:mm
-  color: string; // tailwind color token
+  color: string;
   completed: boolean;
   createdAt: string;
-}
-
-const STORAGE_KEY = 'cic_agenda_tasks';
-
-function generateId(): string {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-}
-
-export function getAgendaTasks(): AgendaTask[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-export function saveAgendaTask(task: AgendaTask): void {
-  const tasks = getAgendaTasks();
-  const idx = tasks.findIndex(t => t.id === task.id);
-  if (idx >= 0) tasks[idx] = task;
-  else tasks.push(task);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-}
-
-export function deleteAgendaTask(id: string): void {
-  const tasks = getAgendaTasks().filter(t => t.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-}
-
-export function createAgendaTask(data: Omit<AgendaTask, 'id' | 'createdAt' | 'completed'>): AgendaTask {
-  return {
-    ...data,
-    id: generateId(),
-    completed: false,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-export function getTasksForDate(date: string): AgendaTask[] {
-  return getAgendaTasks()
-    .filter(t => t.date === date)
-    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
 
 export const TASK_COLORS = [
@@ -59,7 +20,6 @@ export const TASK_COLORS = [
   { label: 'Gris', value: 'muted' },
 ];
 
-// Generate hours for the day view
 export function getDayHours(): string[] {
   const hours: string[] = [];
   for (let h = 6; h <= 23; h++) {
@@ -68,21 +28,77 @@ export function getDayHours(): string[] {
   return hours;
 }
 
-// Sample data initialization
-export function initializeAgendaSampleData(): void {
-  if (localStorage.getItem(STORAGE_KEY)) return;
-  const today = new Date();
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+// --- Supabase CRUD ---
 
-  const samples: AgendaTask[] = [
-    { id: generateId(), title: 'Revisión de proyecto web', description: 'Revisar avances del sitio con el equipo', date: fmt(today), startTime: '09:00', endTime: '10:00', color: 'primary', completed: false, createdAt: today.toISOString() },
-    { id: generateId(), title: 'Llamada con cliente', description: 'Presentar propuesta de rediseño', date: fmt(today), startTime: '11:00', endTime: '12:00', color: 'accent', completed: false, createdAt: today.toISOString() },
-    { id: generateId(), title: 'Actualizar documentación', description: 'Documentar cambios en la API', date: fmt(today), startTime: '14:00', endTime: '15:30', color: 'warning', completed: true, createdAt: today.toISOString() },
-    { id: generateId(), title: 'Deploy a producción', description: 'Subir cambios al servidor', date: fmt(today), startTime: '16:00', endTime: '17:00', color: 'destructive', completed: false, createdAt: today.toISOString() },
-    { id: generateId(), title: 'Planificación semanal', description: 'Definir tareas de la semana', date: fmt(tomorrow), startTime: '08:00', endTime: '09:00', color: 'primary', completed: false, createdAt: today.toISOString() },
-    { id: generateId(), title: 'Reunión de equipo', description: 'Stand-up diario', date: fmt(tomorrow), startTime: '10:00', endTime: '10:30', color: 'accent', completed: false, createdAt: today.toISOString() },
-  ];
+function mapRow(row: any): AgendaTask {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description || '',
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    color: row.color,
+    completed: row.completed,
+    createdAt: row.created_at,
+  };
+}
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(samples));
+export async function getAgendaTasks(): Promise<AgendaTask[]> {
+  const { data, error } = await supabase
+    .from('agenda_tasks')
+    .select('*')
+    .order('date', { ascending: true })
+    .order('start_time', { ascending: true });
+  if (error) { console.error(error); return []; }
+  return (data || []).map(mapRow);
+}
+
+export async function getTasksForDate(date: string): Promise<AgendaTask[]> {
+  const { data, error } = await supabase
+    .from('agenda_tasks')
+    .select('*')
+    .eq('date', date)
+    .order('start_time', { ascending: true });
+  if (error) { console.error(error); return []; }
+  return (data || []).map(mapRow);
+}
+
+export async function saveAgendaTask(task: AgendaTask): Promise<void> {
+  const { error } = await supabase
+    .from('agenda_tasks')
+    .upsert({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      date: task.date,
+      start_time: task.startTime,
+      end_time: task.endTime,
+      color: task.color,
+      completed: task.completed,
+    });
+  if (error) console.error(error);
+}
+
+export async function deleteAgendaTask(id: string): Promise<void> {
+  const { error } = await supabase.from('agenda_tasks').delete().eq('id', id);
+  if (error) console.error(error);
+}
+
+export async function createAgendaTask(data: Omit<AgendaTask, 'id' | 'createdAt' | 'completed'>): Promise<AgendaTask> {
+  const { data: rows, error } = await supabase
+    .from('agenda_tasks')
+    .insert({
+      title: data.title,
+      description: data.description,
+      date: data.date,
+      start_time: data.startTime,
+      end_time: data.endTime,
+      color: data.color,
+      completed: false,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapRow(rows);
 }
