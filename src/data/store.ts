@@ -202,5 +202,5 @@ export function initializeIfNeeded(): void {
   set(KEYS.payments, samplePayments);
   set(KEYS.config, { reminderDays: [7, 1] });
   localStorage.setItem(KEYS.initialized, '1');
-  initializeAgendaSampleData();
+  
 }
