@@ -64,6 +64,18 @@ export async function getTasksForDate(date: string): Promise<AgendaTask[]> {
   return (data || []).map(mapRow);
 }
 
+export async function getOverdueTasks(beforeDate: string): Promise<AgendaTask[]> {
+  const { data, error } = await supabase
+    .from('agenda_tasks')
+    .select('*')
+    .lt('date', beforeDate)
+    .eq('completed', false)
+    .order('date', { ascending: false })
+    .order('start_time', { ascending: true });
+  if (error) { console.error(error); return []; }
+  return (data || []).map(mapRow);
+}
+
 export async function saveAgendaTask(task: AgendaTask): Promise<void> {
   const { error } = await supabase
     .from('agenda_tasks')

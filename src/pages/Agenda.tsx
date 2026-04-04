@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2 } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   AgendaTask,
   getTasksForDate,
+  getOverdueTasks,
   saveAgendaTask,
   deleteAgendaTask,
   createAgendaTask,
@@ -63,6 +64,7 @@ export default function AgendaPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tasks, setTasks] = useState<AgendaTask[]>([]);
   const [weekTasks, setWeekTasks] = useState<Record<string, AgendaTask[]>>({});
+  const [overdueTasks, setOverdueTasks] = useState<AgendaTask[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTask, setEditTask] = useState<AgendaTask | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -75,12 +77,16 @@ export default function AgendaPage() {
   const [formColor, setFormColor] = useState('primary');
 
   const dateStr = fmt(selectedDate);
+  const today = fmt(new Date());
   const weekDays = useMemo(() => getWeekDays(selectedDate), [dateStr]);
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
     const dayTasks = await getTasksForDate(dateStr);
     setTasks(dayTasks);
+
+    const overdue = await getOverdueTasks(today);
+    setOverdueTasks(overdue);
 
     const wt: Record<string, AgendaTask[]> = {};
     await Promise.all(weekDays.map(async d => {
@@ -89,11 +95,10 @@ export default function AgendaPage() {
     }));
     setWeekTasks(wt);
     setLoading(false);
-  }, [dateStr, weekDays]);
+  }, [dateStr, weekDays, today]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
-  const today = fmt(new Date());
   const isToday = dateStr === today;
 
   const navigateDay = (delta: number) => {
@@ -251,6 +256,40 @@ export default function AgendaPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`text-sm font-medium ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{task.title}</span>
                     <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${colorClass(task.color)}`}>{task.startTime} – {task.endTime}</Badge>
+                  </div>
+                  {task.description && <p className="text-xs text-muted-foreground mt-1 truncate">{task.description}</p>}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => openEdit(task)}>
+                    <Edit2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(task.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Overdue tasks */}
+      {overdueTasks.length > 0 && (
+        <div className="space-y-2 mt-6">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <h3 className="text-sm font-semibold text-warning">Tareas pendientes de días anteriores ({overdueTasks.length})</h3>
+          </div>
+          {overdueTasks.map(task => (
+            <Card key={task.id} className="card-metallic border-l-4 border-l-warning/60 transition-all hover:shadow-md opacity-80">
+              <CardContent className="p-3 flex items-start gap-3">
+                <Checkbox checked={task.completed} onCheckedChange={() => toggleComplete(task)} className="mt-1 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-foreground">{task.title}</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-warning/10 border-warning/30 text-warning">
+                      {task.date} · {task.startTime} – {task.endTime}
+                    </Badge>
                   </div>
                   {task.description && <p className="text-xs text-muted-foreground mt-1 truncate">{task.description}</p>}
                 </div>
