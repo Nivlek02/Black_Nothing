@@ -121,7 +121,7 @@ export default function AgendaPage() {
 
   const openCreate = () => {
     setEditTask(null);
-    setFormTitle(''); setFormDesc(''); setFormStart('09:00'); setFormEnd('10:00'); setFormColor('primary');
+    setFormTitle(''); setFormDesc(''); setFormDate(selectedDate); setFormStart('09:00'); setFormEnd('10:00'); setFormColor('primary');
     setDialogOpen(true);
   };
 
