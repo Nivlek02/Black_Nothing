@@ -134,11 +134,12 @@ export default function AgendaPage() {
   const handleSave = async () => {
     if (!formTitle.trim()) return;
     try {
+      const targetDate = fmt(formDate);
       if (editTask) {
-        await saveAgendaTask({ ...editTask, title: formTitle, description: formDesc, startTime: formStart, endTime: formEnd, color: formColor });
+        await saveAgendaTask({ ...editTask, title: formTitle, description: formDesc, date: targetDate, startTime: formStart, endTime: formEnd, color: formColor });
         toast({ title: 'Tarea actualizada' });
       } else {
-        await createAgendaTask({ title: formTitle, description: formDesc, date: dateStr, startTime: formStart, endTime: formEnd, color: formColor });
+        await createAgendaTask({ title: formTitle, description: formDesc, date: targetDate, startTime: formStart, endTime: formEnd, color: formColor });
         toast({ title: 'Tarea creada' });
       }
       setDialogOpen(false);
