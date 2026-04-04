@@ -77,6 +77,7 @@ export default function AgendaPage() {
   const [formColor, setFormColor] = useState('primary');
 
   const dateStr = fmt(selectedDate);
+  const today = fmt(new Date());
   const weekDays = useMemo(() => getWeekDays(selectedDate), [dateStr]);
 
   const loadTasks = useCallback(async () => {
