@@ -84,6 +84,9 @@ export default function AgendaPage() {
     const dayTasks = await getTasksForDate(dateStr);
     setTasks(dayTasks);
 
+    const overdue = await getOverdueTasks(today);
+    setOverdueTasks(overdue);
+
     const wt: Record<string, AgendaTask[]> = {};
     await Promise.all(weekDays.map(async d => {
       const ds = fmt(d);
@@ -91,7 +94,7 @@ export default function AgendaPage() {
     }));
     setWeekTasks(wt);
     setLoading(false);
-  }, [dateStr, weekDays]);
+  }, [dateStr, weekDays, today]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
