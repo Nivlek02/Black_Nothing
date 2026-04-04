@@ -1,5 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2, AlertTriangle } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2, AlertTriangle, CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,6 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import {
   AgendaTask,
@@ -72,6 +77,7 @@ export default function AgendaPage() {
 
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
+  const [formDate, setFormDate] = useState<Date>(new Date());
   const [formStart, setFormStart] = useState('09:00');
   const [formEnd, setFormEnd] = useState('10:00');
   const [formColor, setFormColor] = useState('primary');
@@ -115,24 +121,25 @@ export default function AgendaPage() {
 
   const openCreate = () => {
     setEditTask(null);
-    setFormTitle(''); setFormDesc(''); setFormStart('09:00'); setFormEnd('10:00'); setFormColor('primary');
+    setFormTitle(''); setFormDesc(''); setFormDate(selectedDate); setFormStart('09:00'); setFormEnd('10:00'); setFormColor('primary');
     setDialogOpen(true);
   };
 
   const openEdit = (task: AgendaTask) => {
     setEditTask(task);
-    setFormTitle(task.title); setFormDesc(task.description); setFormStart(task.startTime); setFormEnd(task.endTime); setFormColor(task.color);
+    setFormTitle(task.title); setFormDesc(task.description); setFormDate(new Date(task.date + 'T12:00:00')); setFormStart(task.startTime); setFormEnd(task.endTime); setFormColor(task.color);
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     if (!formTitle.trim()) return;
     try {
+      const targetDate = fmt(formDate);
       if (editTask) {
-        await saveAgendaTask({ ...editTask, title: formTitle, description: formDesc, startTime: formStart, endTime: formEnd, color: formColor });
+        await saveAgendaTask({ ...editTask, title: formTitle, description: formDesc, date: targetDate, startTime: formStart, endTime: formEnd, color: formColor });
         toast({ title: 'Tarea actualizada' });
       } else {
-        await createAgendaTask({ title: formTitle, description: formDesc, date: dateStr, startTime: formStart, endTime: formEnd, color: formColor });
+        await createAgendaTask({ title: formTitle, description: formDesc, date: targetDate, startTime: formStart, endTime: formEnd, color: formColor });
         toast({ title: 'Tarea creada' });
       }
       setDialogOpen(false);
@@ -317,6 +324,20 @@ export default function AgendaPage() {
             <div>
               <label className="text-sm text-muted-foreground">Título *</label>
               <Input value={formTitle} onChange={e => setFormTitle(e.target.value)} placeholder="Nombre de la tarea" className="mt-1 bg-secondary/50" />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Fecha</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full mt-1 justify-start text-left font-normal bg-secondary/50", !formDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formDate ? format(formDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={formDate} onSelect={(d) => d && setFormDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="text-sm text-muted-foreground">Descripción</label>
