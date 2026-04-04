@@ -77,6 +77,7 @@ export default function AgendaPage() {
 
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
+  const [formDate, setFormDate] = useState<Date>(new Date());
   const [formStart, setFormStart] = useState('09:00');
   const [formEnd, setFormEnd] = useState('10:00');
   const [formColor, setFormColor] = useState('primary');
