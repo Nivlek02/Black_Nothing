@@ -64,6 +64,7 @@ export default function AgendaPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tasks, setTasks] = useState<AgendaTask[]>([]);
   const [weekTasks, setWeekTasks] = useState<Record<string, AgendaTask[]>>({});
+  const [overdueTasks, setOverdueTasks] = useState<AgendaTask[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTask, setEditTask] = useState<AgendaTask | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
