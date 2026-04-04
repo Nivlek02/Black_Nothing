@@ -326,6 +326,20 @@ export default function AgendaPage() {
               <Input value={formTitle} onChange={e => setFormTitle(e.target.value)} placeholder="Nombre de la tarea" className="mt-1 bg-secondary/50" />
             </div>
             <div>
+              <label className="text-sm text-muted-foreground">Fecha</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full mt-1 justify-start text-left font-normal bg-secondary/50", !formDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formDate ? format(formDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={formDate} onSelect={(d) => d && setFormDate(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
               <label className="text-sm text-muted-foreground">Descripción</label>
               <Textarea value={formDesc} onChange={e => setFormDesc(e.target.value)} placeholder="Detalles..." rows={2} className="mt-1 bg-secondary/50" />
             </div>
