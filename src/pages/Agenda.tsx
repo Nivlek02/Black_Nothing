@@ -127,7 +127,7 @@ export default function AgendaPage() {
 
   const openEdit = (task: AgendaTask) => {
     setEditTask(task);
-    setFormTitle(task.title); setFormDesc(task.description); setFormStart(task.startTime); setFormEnd(task.endTime); setFormColor(task.color);
+    setFormTitle(task.title); setFormDesc(task.description); setFormDate(new Date(task.date + 'T12:00:00')); setFormStart(task.startTime); setFormEnd(task.endTime); setFormColor(task.color);
     setDialogOpen(true);
   };
 
