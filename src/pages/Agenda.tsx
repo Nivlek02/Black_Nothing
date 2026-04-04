@@ -99,7 +99,6 @@ export default function AgendaPage() {
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
-  const today = fmt(new Date());
   const isToday = dateStr === today;
 
   const navigateDay = (delta: number) => {
