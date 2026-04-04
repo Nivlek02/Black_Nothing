@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2 } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Trash2, Edit2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
