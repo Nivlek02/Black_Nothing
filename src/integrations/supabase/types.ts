@@ -234,6 +234,7 @@ export type Database = {
           keys_auth: string
           keys_p256dh: string
           reminder_minutes: number
+          timezone: string
         }
         Insert: {
           created_at?: string
@@ -242,6 +243,7 @@ export type Database = {
           keys_auth: string
           keys_p256dh: string
           reminder_minutes?: number
+          timezone?: string
         }
         Update: {
           created_at?: string
@@ -250,6 +252,7 @@ export type Database = {
           keys_auth?: string
           keys_p256dh?: string
           reminder_minutes?: number
+          timezone?: string
         }
         Relationships: []
       }
