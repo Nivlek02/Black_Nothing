@@ -24,6 +24,7 @@ import {
   createAgendaTask,
   getDayHours,
   TASK_COLORS,
+  REMINDER_OPTIONS,
 } from '@/data/agenda';
 
 const DAYS_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
