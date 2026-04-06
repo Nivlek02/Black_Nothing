@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, BellOff, BellRing, ChevronDown } from 'lucide-react';
+import { BellOff, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -14,6 +14,7 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
   isCurrentlySubscribed,
+  syncPushSubscription,
   REMINDER_OPTIONS,
 } from '@/lib/pushNotifications';
 
@@ -48,15 +49,21 @@ export default function NotificationSettings() {
     const init = async () => {
       const sup = isPushSupported();
       setSupported(sup);
+
+      const saved = localStorage.getItem('reminder_minutes');
+      const initialReminder = saved ? parseInt(saved, 10) : 10;
+      setReminderMinutes(initialReminder);
       setPermission(getNotificationPermission());
+
       if (sup) {
         await registerServiceWorker();
         const sub = await isCurrentlySubscribed();
         setSubscribed(sub);
+
+        if (sub) {
+          await syncPushSubscription(initialReminder);
+        }
       }
-      // Load saved reminder preference
-      const saved = localStorage.getItem('reminder_minutes');
-      if (saved) setReminderMinutes(parseInt(saved, 10));
     };
     init();
   }, []);
@@ -65,16 +72,10 @@ export default function NotificationSettings() {
     setLoading(true);
     try {
       if (enabled) {
-        const sub = await subscribeToPush();
+        const sub = await subscribeToPush(reminderMinutes);
         if (sub) {
           setSubscribed(true);
           setPermission('granted');
-          // Update reminder minutes on server
-          const subJson = sub.toJSON();
-          await supabase
-            .from('push_subscriptions')
-            .update({ reminder_minutes: reminderMinutes })
-            .eq('endpoint', subJson.endpoint as string);
           toast({ title: '🔔 Notificaciones activadas', description: 'Recibirás recordatorios de tus eventos.' });
         } else {
           setPermission(getNotificationPermission());
@@ -100,18 +101,7 @@ export default function NotificationSettings() {
     localStorage.setItem('reminder_minutes', value);
 
     if (subscribed) {
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        const sub = await registration.pushManager.getSubscription();
-        if (sub) {
-          await supabase
-            .from('push_subscriptions')
-            .update({ reminder_minutes: mins })
-            .eq('endpoint', sub.endpoint);
-        }
-      } catch (err) {
-        console.error('Failed to update reminder:', err);
-      }
+      await syncPushSubscription(mins);
     }
   };
 
@@ -161,7 +151,7 @@ export default function NotificationSettings() {
         )}
 
         {subscribed && (
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <Label className="text-sm">Anticipación del recordatorio</Label>
             <Select value={String(reminderMinutes)} onValueChange={handleReminderChange}>
               <SelectTrigger className="w-[180px]">

@@ -13,6 +13,14 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+export function getDeviceTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
 export function isPushSupported(): boolean {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 }
@@ -24,12 +32,13 @@ export function getNotificationPermission(): NotificationPermission {
 
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator)) return null;
-  
-  // Don't register in iframes or preview hosts
+
   try {
     if (window.self !== window.top) return null;
-  } catch { return null; }
-  
+  } catch {
+    return null;
+  }
+
   if (window.location.hostname.includes('id-preview--') || window.location.hostname.includes('lovableproject.com')) {
     return null;
   }
@@ -43,13 +52,31 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   }
 }
 
-export async function subscribeToPush(): Promise<PushSubscription | null> {
+export async function syncPushSubscription(reminderMinutes = 10): Promise<void> {
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (!subscription) return;
+
+    await supabase.functions.invoke('push-subscribe', {
+      body: {
+        subscription: subscription.toJSON(),
+        reminderMinutes,
+        timezone: getDeviceTimezone(),
+      },
+    });
+  } catch (err) {
+    console.error('Push subscription sync failed:', err);
+  }
+}
+
+export async function subscribeToPush(reminderMinutes = 10): Promise<PushSubscription | null> {
   try {
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return null;
 
     const registration = await navigator.serviceWorker.ready;
-    
+
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
@@ -58,10 +85,12 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
       });
     }
 
-    // Save subscription to backend
-    const subJson = subscription.toJSON();
     await supabase.functions.invoke('push-subscribe', {
-      body: { subscription: subJson },
+      body: {
+        subscription: subscription.toJSON(),
+        reminderMinutes,
+        timezone: getDeviceTimezone(),
+      },
     });
 
     return subscription;
@@ -98,7 +127,6 @@ export async function isCurrentlySubscribed(): Promise<boolean> {
   }
 }
 
-// Reminder interval options
 export const REMINDER_OPTIONS = [
   { value: 5, label: '5 minutos antes' },
   { value: 10, label: '10 minutos antes' },
