@@ -122,13 +122,13 @@ export default function AgendaPage() {
 
   const openCreate = () => {
     setEditTask(null);
-    setFormTitle(''); setFormDesc(''); setFormDate(selectedDate); setFormStart('09:00'); setFormEnd('10:00'); setFormColor('primary');
+    setFormTitle(''); setFormDesc(''); setFormDate(selectedDate); setFormStart('09:00'); setFormEnd('10:00'); setFormColor('primary'); setFormReminder(10);
     setDialogOpen(true);
   };
 
   const openEdit = (task: AgendaTask) => {
     setEditTask(task);
-    setFormTitle(task.title); setFormDesc(task.description); setFormDate(new Date(task.date + 'T12:00:00')); setFormStart(task.startTime); setFormEnd(task.endTime); setFormColor(task.color);
+    setFormTitle(task.title); setFormDesc(task.description); setFormDate(new Date(task.date + 'T12:00:00')); setFormStart(task.startTime); setFormEnd(task.endTime); setFormColor(task.color); setFormReminder(task.reminderMinutes);
     setDialogOpen(true);
   };
 
