@@ -23,6 +23,8 @@ export type Database = {
           description: string | null
           end_time: string
           id: string
+          notified: boolean
+          reminder_minutes: number
           start_time: string
           title: string
         }
@@ -34,6 +36,8 @@ export type Database = {
           description?: string | null
           end_time: string
           id?: string
+          notified?: boolean
+          reminder_minutes?: number
           start_time: string
           title: string
         }
@@ -45,6 +49,8 @@ export type Database = {
           description?: string | null
           end_time?: string
           id?: string
+          notified?: boolean
+          reminder_minutes?: number
           start_time?: string
           title?: string
         }

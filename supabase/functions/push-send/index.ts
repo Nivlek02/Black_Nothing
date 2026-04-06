@@ -26,16 +26,9 @@ function bytesToBase64Url(bytes: Uint8Array): string {
 
 function vapidJwkFromKeys(publicKeyB64: string, privateKeyB64: string) {
   const pubBytes = base64UrlToBytes(publicKeyB64);
-  // pubBytes is 65 bytes: 0x04 || x(32) || y(32)
   const x = bytesToBase64Url(pubBytes.slice(1, 33));
   const y = bytesToBase64Url(pubBytes.slice(33, 65));
-  return {
-    kty: "EC",
-    crv: "P-256",
-    x,
-    y,
-    d: privateKeyB64,
-  };
+  return { kty: "EC", crv: "P-256", x, y, d: privateKeyB64 };
 }
 
 function normalizeTimeZone(timeZone?: string) {
@@ -51,24 +44,16 @@ function normalizeTimeZone(timeZone?: string) {
 function getTimeZoneParts(date: Date, timeZone: string) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
     hourCycle: "h23",
   });
   const parts = Object.fromEntries(
     formatter.formatToParts(date).map((p) => [p.type, p.value])
   );
   return {
-    year: Number(parts.year),
-    month: Number(parts.month),
-    day: Number(parts.day),
-    hour: Number(parts.hour),
-    minute: Number(parts.minute),
-    second: Number(parts.second),
+    year: Number(parts.year), month: Number(parts.month), day: Number(parts.day),
+    hour: Number(parts.hour), minute: Number(parts.minute), second: Number(parts.second),
   };
 }
 
@@ -92,31 +77,19 @@ async function sendPush(
   payload: { title: string; body: string; tag: string; url: string }
 ) {
   const jwk = vapidJwkFromKeys(VAPID_PUBLIC_KEY, vapidPrivateKey);
-
   const { endpoint, headers, body } = await buildPushHTTPRequest({
     privateJWK: jwk,
     subscription: {
       endpoint: subscription.endpoint,
-      keys: {
-        p256dh: subscription.keys_p256dh,
-        auth: subscription.keys_auth,
-      },
+      keys: { p256dh: subscription.keys_p256dh, auth: subscription.keys_auth },
     },
-    message: {
-      payload,
-      adminContact: VAPID_SUBJECT,
-      ttl: 60,
-      urgency: "high",
-    },
+    message: { payload, adminContact: VAPID_SUBJECT, ttl: 60, urgency: "high" },
   });
 
   const response = await fetch(endpoint, { method: "POST", headers, body });
   const text = await response.text();
-
   if (!response.ok) {
-    throw Object.assign(new Error(text || `HTTP ${response.status}`), {
-      statusCode: response.status,
-    });
+    throw Object.assign(new Error(text || `HTTP ${response.status}`), { statusCode: response.status });
   }
 }
 
@@ -132,12 +105,22 @@ Deno.serve(async (req) => {
     );
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY")!;
 
-    let isTest = false;
-    try {
-      const b = await req.json();
-      isTest = b?.test === true;
-    } catch {
-      isTest = false;
+    const now = new Date();
+    const candidateDates = getCandidateDates(now);
+
+    // Get tasks that have a reminder set, are not completed, and haven't been notified yet
+    const { data: tasks, error: taskError } = await supabase
+      .from("agenda_tasks")
+      .select("*")
+      .in("date", candidateDates)
+      .eq("completed", false)
+      .eq("notified", false)
+      .gt("reminder_minutes", 0);
+
+    if (taskError || !tasks?.length) {
+      return new Response(JSON.stringify({ sent: 0, message: "No pending tasks" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const { data: subscriptions, error: subError } = await supabase
@@ -150,52 +133,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // --- TEST MODE ---
-    if (isTest) {
-      let sentCount = 0;
-      for (const sub of subscriptions) {
-        try {
-          await sendPush(vapidPrivateKey, sub, {
-            title: "🔔 Notificación de prueba",
-            body: "¡Las notificaciones están funcionando!",
-            tag: `test-${Date.now()}`,
-            url: "/agenda",
-          });
-          sentCount++;
-          console.log(`Test OK → ${sub.endpoint.slice(0, 60)}`);
-        } catch (err) {
-          console.error(`Test send failed for ${sub.id}:`, err.message);
-          if (err.statusCode === 404 || err.statusCode === 410) {
-            await supabase.from("push_subscriptions").delete().eq("id", sub.id);
-          }
-        }
-      }
-      return new Response(JSON.stringify({ sent: sentCount, test: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // --- SCHEDULED MODE ---
-    const now = new Date();
-    const candidateDates = getCandidateDates(now);
-
-    const { data: tasks, error: taskError } = await supabase
-      .from("agenda_tasks")
-      .select("*")
-      .in("date", candidateDates)
-      .eq("completed", false);
-
-    if (taskError || !tasks?.length) {
-      return new Response(JSON.stringify({ sent: 0, message: "No upcoming tasks" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     let sentCount = 0;
+    const notifiedTaskIds: string[] = [];
 
     for (const sub of subscriptions) {
       const tz = normalizeTimeZone(sub.timezone);
-      const reminderMs = (sub.reminder_minutes || 10) * 60 * 1000;
       const nowLocal = getTimeZoneParts(now, tz);
       const nowLocalTs = Date.UTC(
         nowLocal.year, nowLocal.month - 1, nowLocal.day,
@@ -203,6 +145,8 @@ Deno.serve(async (req) => {
       );
 
       for (const task of tasks) {
+        // Use the task's own reminder_minutes
+        const reminderMs = (task.reminder_minutes || 10) * 60 * 1000;
         const taskTs = localTimestamp(task.date, task.start_time);
         const diff = taskTs - nowLocalTs;
 
@@ -215,6 +159,9 @@ Deno.serve(async (req) => {
               url: "/agenda",
             });
             sentCount++;
+            if (!notifiedTaskIds.includes(task.id)) {
+              notifiedTaskIds.push(task.id);
+            }
           } catch (err) {
             console.error(`Failed ${sub.id}:`, err.message);
             if (err.statusCode === 404 || err.statusCode === 410) {
@@ -225,7 +172,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`${tasks.length} tasks, ${sentCount} sent`);
+    // Mark tasks as notified so they don't get re-sent
+    if (notifiedTaskIds.length > 0) {
+      await supabase
+        .from("agenda_tasks")
+        .update({ notified: true })
+        .in("id", notifiedTaskIds);
+    }
+
+    console.log(`${tasks.length} tasks checked, ${sentCount} sent, ${notifiedTaskIds.length} marked notified`);
     return new Response(JSON.stringify({ sent: sentCount }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

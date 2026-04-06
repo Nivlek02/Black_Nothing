@@ -10,6 +10,8 @@ export interface AgendaTask {
   color: string;
   completed: boolean;
   createdAt: string;
+  reminderMinutes: number;
+  notified: boolean;
 }
 
 export const TASK_COLORS = [
@@ -18,6 +20,15 @@ export const TASK_COLORS = [
   { label: 'Amarillo', value: 'warning' },
   { label: 'Rojo', value: 'destructive' },
   { label: 'Gris', value: 'muted' },
+];
+
+export const REMINDER_OPTIONS = [
+  { value: 0, label: 'Sin recordatorio' },
+  { value: 5, label: '5 minutos antes' },
+  { value: 10, label: '10 minutos antes' },
+  { value: 15, label: '15 minutos antes' },
+  { value: 30, label: '30 minutos antes' },
+  { value: 60, label: '1 hora antes' },
 ];
 
 export function getDayHours(): string[] {
@@ -41,6 +52,8 @@ function mapRow(row: any): AgendaTask {
     color: row.color,
     completed: row.completed,
     createdAt: row.created_at,
+    reminderMinutes: row.reminder_minutes ?? 10,
+    notified: row.notified ?? false,
   };
 }
 
@@ -88,6 +101,8 @@ export async function saveAgendaTask(task: AgendaTask): Promise<void> {
       end_time: task.endTime,
       color: task.color,
       completed: task.completed,
+      reminder_minutes: task.reminderMinutes,
+      notified: task.notified,
     });
   if (error) console.error(error);
 }
@@ -97,7 +112,7 @@ export async function deleteAgendaTask(id: string): Promise<void> {
   if (error) console.error(error);
 }
 
-export async function createAgendaTask(data: Omit<AgendaTask, 'id' | 'createdAt' | 'completed'>): Promise<AgendaTask> {
+export async function createAgendaTask(data: Omit<AgendaTask, 'id' | 'createdAt' | 'completed' | 'notified'>): Promise<AgendaTask> {
   const { data: rows, error } = await supabase
     .from('agenda_tasks')
     .insert({
@@ -108,6 +123,7 @@ export async function createAgendaTask(data: Omit<AgendaTask, 'id' | 'createdAt'
       end_time: data.endTime,
       color: data.color,
       completed: false,
+      reminder_minutes: data.reminderMinutes,
     })
     .select()
     .single();

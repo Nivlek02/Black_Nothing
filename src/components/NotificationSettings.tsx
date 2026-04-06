@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { BellOff, BellRing } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+
 import {
   isPushSupported,
   getNotificationPermission,
@@ -24,26 +24,7 @@ export default function NotificationSettings() {
   const [subscribed, setSubscribed] = useState(false);
   const [reminderMinutes, setReminderMinutes] = useState(10);
   const [loading, setLoading] = useState(false);
-  const [testLoading, setTestLoading] = useState(false);
   const { toast } = useToast();
-
-  const handleTestNotification = async () => {
-    setTestLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('push-send', {
-        body: { test: true },
-      });
-      if (error) throw error;
-      toast({
-        title: data?.sent > 0 ? '✅ Notificación enviada' : '⚠️ Sin resultado',
-        description: data?.sent > 0 ? 'Revisa tu dispositivo.' : 'No se pudo enviar. Verifica los permisos.',
-      });
-    } catch (err) {
-      console.error(err);
-      toast({ title: 'Error', description: 'No se pudo enviar la notificación de prueba.', variant: 'destructive' });
-    }
-    setTestLoading(false);
-  };
 
   useEffect(() => {
     const init = async () => {
@@ -168,17 +149,6 @@ export default function NotificationSettings() {
           </div>
         )}
 
-        {subscribed && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            disabled={testLoading}
-            onClick={handleTestNotification}
-          >
-            {testLoading ? 'Enviando...' : '🔔 Enviar notificación de prueba'}
-          </Button>
-        )}
 
         <p className="text-xs text-muted-foreground">
           {subscribed

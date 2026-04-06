@@ -24,6 +24,7 @@ import {
   createAgendaTask,
   getDayHours,
   TASK_COLORS,
+  REMINDER_OPTIONS,
 } from '@/data/agenda';
 
 const DAYS_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -81,7 +82,7 @@ export default function AgendaPage() {
   const [formStart, setFormStart] = useState('09:00');
   const [formEnd, setFormEnd] = useState('10:00');
   const [formColor, setFormColor] = useState('primary');
-
+  const [formReminder, setFormReminder] = useState(10);
   const dateStr = fmt(selectedDate);
   const today = fmt(new Date());
   const weekDays = useMemo(() => getWeekDays(selectedDate), [dateStr]);
@@ -121,13 +122,13 @@ export default function AgendaPage() {
 
   const openCreate = () => {
     setEditTask(null);
-    setFormTitle(''); setFormDesc(''); setFormDate(selectedDate); setFormStart('09:00'); setFormEnd('10:00'); setFormColor('primary');
+    setFormTitle(''); setFormDesc(''); setFormDate(selectedDate); setFormStart('09:00'); setFormEnd('10:00'); setFormColor('primary'); setFormReminder(10);
     setDialogOpen(true);
   };
 
   const openEdit = (task: AgendaTask) => {
     setEditTask(task);
-    setFormTitle(task.title); setFormDesc(task.description); setFormDate(new Date(task.date + 'T12:00:00')); setFormStart(task.startTime); setFormEnd(task.endTime); setFormColor(task.color);
+    setFormTitle(task.title); setFormDesc(task.description); setFormDate(new Date(task.date + 'T12:00:00')); setFormStart(task.startTime); setFormEnd(task.endTime); setFormColor(task.color); setFormReminder(task.reminderMinutes);
     setDialogOpen(true);
   };
 
@@ -136,10 +137,10 @@ export default function AgendaPage() {
     try {
       const targetDate = fmt(formDate);
       if (editTask) {
-        await saveAgendaTask({ ...editTask, title: formTitle, description: formDesc, date: targetDate, startTime: formStart, endTime: formEnd, color: formColor });
+        await saveAgendaTask({ ...editTask, title: formTitle, description: formDesc, date: targetDate, startTime: formStart, endTime: formEnd, color: formColor, reminderMinutes: formReminder, notified: false });
         toast({ title: 'Tarea actualizada' });
       } else {
-        await createAgendaTask({ title: formTitle, description: formDesc, date: targetDate, startTime: formStart, endTime: formEnd, color: formColor });
+        await createAgendaTask({ title: formTitle, description: formDesc, date: targetDate, startTime: formStart, endTime: formEnd, color: formColor, reminderMinutes: formReminder });
         toast({ title: 'Tarea creada' });
       }
       setDialogOpen(false);
@@ -364,6 +365,19 @@ export default function AgendaPage() {
                         <div className={`w-3 h-3 rounded-full ${dotColor(c.value)}`} />
                         {c.label}
                       </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Recordatorio</label>
+              <Select value={String(formReminder)} onValueChange={v => setFormReminder(Number(v))}>
+                <SelectTrigger className="mt-1 bg-secondary/50"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {REMINDER_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={String(opt.value)}>
+                      {opt.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
