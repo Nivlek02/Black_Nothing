@@ -113,6 +113,9 @@ export default function HomePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Notification Settings */}
+      <NotificationSettings />
     </div>
   );
 }
