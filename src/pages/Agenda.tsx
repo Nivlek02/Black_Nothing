@@ -82,7 +82,7 @@ export default function AgendaPage() {
   const [formStart, setFormStart] = useState('09:00');
   const [formEnd, setFormEnd] = useState('10:00');
   const [formColor, setFormColor] = useState('primary');
-
+  const [formReminder, setFormReminder] = useState(10);
   const dateStr = fmt(selectedDate);
   const today = fmt(new Date());
   const weekDays = useMemo(() => getWeekDays(selectedDate), [dateStr]);
