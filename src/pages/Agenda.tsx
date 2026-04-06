@@ -370,6 +370,19 @@ export default function AgendaPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Recordatorio</label>
+              <Select value={String(formReminder)} onValueChange={v => setFormReminder(Number(v))}>
+                <SelectTrigger className="mt-1 bg-secondary/50"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {REMINDER_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={String(opt.value)}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
