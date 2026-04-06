@@ -159,6 +159,18 @@ export default function NotificationSettings() {
           </div>
         )}
 
+        {subscribed && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            disabled={testLoading}
+            onClick={handleTestNotification}
+          >
+            {testLoading ? 'Enviando...' : '🔔 Enviar notificación de prueba'}
+          </Button>
+        )}
+
         <p className="text-xs text-muted-foreground">
           {subscribed
             ? '✅ Recibirás notificaciones antes de tus eventos agendados.'
