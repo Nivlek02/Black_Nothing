@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VAPID_PUBLIC_KEY = "BK-DOBfC4q1PwRPSlfvc-ChGBwGCmdgUkmjUAEFnVG7ginW58Ca3E2gyOY_YygG-exgdlXA657i9yzEEAsviIGI";
+const VAPID_PUBLIC_KEY = "BDDcejjFtPB-BrGNlRmOo8SgU5LOmGZQkMz0y0uwb4HwaP8piJWwj3C_QSyM2ef6IKcYCvzQkF-8J4b4FTSoXiU";
 const VAPID_SUBJECT = "mailto:admin@comandocentral.app";
 
 function base64UrlToBytes(value: string): Uint8Array {
