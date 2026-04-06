@@ -1,10 +1,41 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
-import webpush from "npm:web-push@3.6.7";
+import { buildPushHTTPRequest } from "npm:@pushforge/builder@2.0.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const VAPID_PUBLIC_KEY = "BK-DOBfC4q1PwRPSlfvc-ChGBwGCmdgUkmjUAEFnVG7ginW58Ca3E2gyOY_YygG-exgdlXA657i9yzEEAsviIGI";
+const VAPID_SUBJECT = "mailto:admin@comandocentral.app";
+
+function base64UrlToBytes(value: string): Uint8Array {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const bytes = new Uint8Array(raw.length);
+  for (let index = 0; index < raw.length; index++) {
+    bytes[index] = raw.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function vapidJwkFromKeys(publicKey: string, privateKey: string) {
+  const publicBytes = base64UrlToBytes(publicKey);
+  const privateBytes = base64UrlToBytes(privateKey);
+
+  if (publicBytes.length !== 65 || publicBytes[0] !== 4) {
+    throw new Error("Invalid VAPID public key format");
+  }
+
+  return {
+    kty: "EC",
+    crv: "P-256",
+    x: publicKey.slice(0, 43),
+    y: publicKey.slice(43),
+    d: privateKey,
+  };
+}
 
 function normalizeTimeZone(timeZone?: string) {
   const candidate = timeZone || "UTC";
@@ -42,44 +73,55 @@ function getTimeZoneParts(date: Date, timeZone: string) {
   };
 }
 
-function naiveTimestampFromLocalDateTime(date: string, time: string) {
+function localTimestamp(date: string, time: string) {
   const [year, month, day] = date.split("-").map(Number);
-  const [hour, minute, second = 0] = time.split(":").map(Number);
-  return Date.UTC(year, month - 1, day, hour, minute, second, 0);
+  const [hour, minute] = time.split(":").map(Number);
+  return Date.UTC(year, month - 1, day, hour, minute, 0, 0);
 }
 
 function getCandidateDates(now: Date) {
   return [-2, -1, 0, 1, 2].map((offset) => {
-    const d = new Date(now);
-    d.setUTCDate(d.getUTCDate() + offset);
-    return d.toISOString().slice(0, 10);
+    const next = new Date(now);
+    next.setUTCDate(next.getUTCDate() + offset);
+    return next.toISOString().slice(0, 10);
   });
 }
 
-async function sendNotification(
-  subscription: { endpoint: string; keys_p256dh: string; keys_auth: string },
-  payload: string,
-  vapidPublicKey: string,
+async function sendPush(
   vapidPrivateKey: string,
-  vapidSubject: string
+  subscription: { endpoint: string; keys_p256dh: string; keys_auth: string },
+  payload: { title: string; body: string; tag: string; url: string }
 ) {
-  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
-
-  await webpush.sendNotification(
-    {
+  const { endpoint, headers, body } = await buildPushHTTPRequest({
+    privateJWK: vapidJwkFromKeys(VAPID_PUBLIC_KEY, vapidPrivateKey),
+    subscription: {
       endpoint: subscription.endpoint,
       keys: {
         p256dh: subscription.keys_p256dh,
         auth: subscription.keys_auth,
       },
     },
-    payload,
-    {
-      TTL: 60,
+    message: {
+      payload,
+      adminContact: VAPID_SUBJECT,
+      ttl: 60,
       urgency: "high",
-      topic: undefined,
-    }
-  );
+    },
+  });
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body,
+  });
+
+  const responseText = await response.text();
+
+  if (!response.ok) {
+    throw Object.assign(new Error(responseText || `HTTP ${response.status}`), {
+      statusCode: response.status,
+    });
+  }
 }
 
 Deno.serve(async (req) => {
@@ -93,9 +135,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const vapidPublicKey = "BK-DOBfC4q1PwRPSlfvc-ChGBwGCmdgUkmjUAEFnVG7ginW58Ca3E2gyOY_YygG-exgdlXA657i9yzEEAsviIGI";
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY")!;
-    const vapidSubject = "mailto:admin@comandocentral.app";
 
     let isTest = false;
     try {
@@ -120,18 +160,12 @@ Deno.serve(async (req) => {
 
       for (const sub of subscriptions) {
         try {
-          await sendNotification(
-            sub,
-            JSON.stringify({
-              title: "🔔 Notificación de prueba",
-              body: "La prueba de notificaciones se envió correctamente.",
-              tag: `test-${sub.id}`,
-              url: "/agenda",
-            }),
-            vapidPublicKey,
-            vapidPrivateKey,
-            vapidSubject
-          );
+          await sendPush(vapidPrivateKey, sub, {
+            title: "🔔 Notificación de prueba",
+            body: "La prueba de notificaciones se envió correctamente.",
+            tag: `test-${sub.id}`,
+            url: "/agenda",
+          });
           sentCount++;
         } catch (err) {
           console.error(`Test send failed for ${sub.id}:`, err.message);
@@ -178,25 +212,19 @@ Deno.serve(async (req) => {
       );
 
       for (const task of tasks) {
-        const taskTimestamp = naiveTimestampFromLocalDateTime(task.date, `${task.start_time}:00`);
+        const taskTimestamp = localTimestamp(task.date, task.start_time);
         const diff = taskTimestamp - nowLocalTimestamp;
 
         if (diff > 0 && diff <= reminderMs) {
           try {
-            await sendNotification(
-              sub,
-              JSON.stringify({
-                title: `📅 ${task.title}`,
-                body: `En ${Math.max(1, Math.round(diff / 60000))} min — ${task.start_time} a ${task.end_time}${task.description ? ` · ${task.description}` : ""}`,
-                tag: `task-${task.id}`,
-                url: "/agenda",
-              }),
-              vapidPublicKey,
-              vapidPrivateKey,
-              vapidSubject
-            );
+            await sendPush(vapidPrivateKey, sub, {
+              title: `📅 ${task.title}`,
+              body: `En ${Math.max(1, Math.round(diff / 60000))} min — ${task.start_time} a ${task.end_time}${task.description ? ` · ${task.description}` : ""}`,
+              tag: `task-${task.id}`,
+              url: "/agenda",
+            });
             sentCount++;
-            console.log(`Sent reminder for ${task.id} using timezone ${timeZone}`);
+            console.log(`Sent reminder for ${task.id} with timezone ${timeZone}`);
           } catch (err) {
             console.error(`Failed to send to subscription ${sub.id}:`, err.message);
             if (err.statusCode === 404 || err.statusCode === 410) {
