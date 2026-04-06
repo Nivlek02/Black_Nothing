@@ -4,6 +4,7 @@ import { CalendarDays, Calendar, Clock, CheckCircle2, Circle, TrendingUp, Trendi
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getTasksForDate, AgendaTask } from '@/data/agenda';
 import { getTotalIncomes, getTotalExpenses } from '@/data/finance';
+import NotificationSettings from '@/components/NotificationSettings';
 
 function fmt(d: Date): string { return d.toISOString().split('T')[0]; }
 function fmtCurrency(n: number) {
@@ -112,6 +113,9 @@ export default function HomePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Notification Settings */}
+      <NotificationSettings />
     </div>
   );
 }
