@@ -24,26 +24,7 @@ export default function NotificationSettings() {
   const [subscribed, setSubscribed] = useState(false);
   const [reminderMinutes, setReminderMinutes] = useState(10);
   const [loading, setLoading] = useState(false);
-  const [testLoading, setTestLoading] = useState(false);
   const { toast } = useToast();
-
-  const handleTestNotification = async () => {
-    setTestLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('push-send', {
-        body: { test: true },
-      });
-      if (error) throw error;
-      toast({
-        title: data?.sent > 0 ? '✅ Notificación enviada' : '⚠️ Sin resultado',
-        description: data?.sent > 0 ? 'Revisa tu dispositivo.' : 'No se pudo enviar. Verifica los permisos.',
-      });
-    } catch (err) {
-      console.error(err);
-      toast({ title: 'Error', description: 'No se pudo enviar la notificación de prueba.', variant: 'destructive' });
-    }
-    setTestLoading(false);
-  };
 
   useEffect(() => {
     const init = async () => {
