@@ -16,7 +16,10 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => {
+  const [unlocked, setUnlocked] = useState(false);
   useEffect(() => { initializeIfNeeded(); }, []);
+
+  if (!unlocked) return <PinLock onUnlock={() => setUnlocked(true)} />;
 
   return (
     <QueryClientProvider client={queryClient}>
