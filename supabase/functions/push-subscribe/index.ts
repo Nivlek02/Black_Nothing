@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { subscription, unsubscribe } = await req.json();
+    const { subscription, unsubscribe, reminderMinutes, timezone } = await req.json();
 
     if (!subscription || !subscription.endpoint) {
       return new Response(JSON.stringify({ error: "Missing subscription data" }), {
@@ -36,11 +36,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    const safeReminderMinutes = Number.isFinite(reminderMinutes) ? Number(reminderMinutes) : 10;
+    const safeTimezone = typeof timezone === "string" && timezone.trim() ? timezone.trim() : "UTC";
+
     const { error } = await supabase.from("push_subscriptions").upsert(
       {
         endpoint: subscription.endpoint,
         keys_p256dh: subscription.keys?.p256dh || "",
         keys_auth: subscription.keys?.auth || "",
+        reminder_minutes: safeReminderMinutes,
+        timezone: safeTimezone,
       },
       { onConflict: "endpoint" }
     );
