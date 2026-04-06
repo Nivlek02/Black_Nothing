@@ -9,6 +9,7 @@ import { initializeIfNeeded } from "./data/store";
 import HomePage from "./pages/Index";
 import AgendaPage from "./pages/Agenda";
 import CalendarioPage from "./pages/Calendario";
+import FinanzasPage from "./pages/Finanzas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => {
               <Route path="/" element={<HomePage />} />
               <Route path="/agenda" element={<AgendaPage />} />
               <Route path="/calendario" element={<CalendarioPage />} />
+              <Route path="/finanzas" element={<FinanzasPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </DashboardLayout>

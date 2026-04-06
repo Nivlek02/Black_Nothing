@@ -1,18 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, Calendar, Clock, CheckCircle2, Circle } from 'lucide-react';
+import { CalendarDays, Calendar, Clock, CheckCircle2, Circle, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getTasksForDate, AgendaTask } from '@/data/agenda';
+import { getTotalIncomes, getTotalExpenses } from '@/data/finance';
 
 function fmt(d: Date): string { return d.toISOString().split('T')[0]; }
+function fmtCurrency(n: number) {
+  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
+}
 
 export default function HomePage() {
   const [todayTasks, setTodayTasks] = useState<AgendaTask[]>([]);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpense, setTotalExpense] = useState(0);
   const today = new Date();
   const todayStr = fmt(today);
 
   useEffect(() => {
     getTasksForDate(todayStr).then(setTodayTasks);
+    getTotalIncomes().then(setTotalIncome);
+    getTotalExpenses().then(setTotalExpense);
   }, [todayStr]);
 
   const pending = todayTasks.filter(t => !t.completed).length;
@@ -24,7 +32,7 @@ export default function HomePage() {
         <p className="text-sm text-muted-foreground">Panel de control — {today.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link to="/agenda">
           <Card className="card-metallic hover:shadow-lg transition-shadow cursor-pointer">
             <CardHeader className="pb-2">
@@ -49,6 +57,34 @@ export default function HomePage() {
             <CardContent>
               <p className="text-lg font-semibold text-foreground">Vista anual</p>
               <p className="text-xs text-muted-foreground">Festivos y fechas especiales</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/finanzas">
+          <Card className="card-metallic hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-green-400" /> Ingresos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold font-mono-data text-green-400">{fmtCurrency(totalIncome)}</p>
+              <p className="text-xs text-muted-foreground">Total acumulado</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/finanzas">
+          <Card className="card-metallic hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <TrendingDown className="h-4 w-4 text-red-400" /> Gastos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold font-mono-data text-red-400">{fmtCurrency(totalExpense)}</p>
+              <p className="text-xs text-muted-foreground">Total acumulado</p>
             </CardContent>
           </Card>
         </Link>

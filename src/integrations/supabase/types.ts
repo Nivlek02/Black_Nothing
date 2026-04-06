@@ -50,6 +50,182 @@ export type Database = {
         }
         Relationships: []
       }
+      atm_withdrawals: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          source: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          source?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          source?: string
+        }
+        Relationships: []
+      }
+      credit_card_transactions: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          transaction_type?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          transaction_type?: string
+        }
+        Relationships: []
+      }
+      debt_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          debt_id: string
+          id: string
+          notes: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          debt_id: string
+          id?: string
+          notes?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          debt_id?: string
+          id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debt_payments_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      debts: {
+        Row: {
+          created_at: string
+          due_date: string
+          id: string
+          name: string
+          notes: string | null
+          remaining_amount: number
+          start_date: string
+          status: string
+          total_amount: number
+        }
+        Insert: {
+          created_at?: string
+          due_date: string
+          id?: string
+          name: string
+          notes?: string | null
+          remaining_amount: number
+          start_date: string
+          status?: string
+          total_amount: number
+        }
+        Update: {
+          created_at?: string
+          due_date?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          remaining_amount?: number
+          start_date?: string
+          status?: string
+          total_amount?: number
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string | null
+          expense_type: string
+          id: string
+          payment_method: string
+        }
+        Insert: {
+          amount: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          expense_type?: string
+          id?: string
+          payment_method?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          expense_type?: string
+          id?: string
+          payment_method?: string
+        }
+        Relationships: []
+      }
+      incomes: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          payment_method: string
+        }
+        Insert: {
+          amount: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          payment_method?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          payment_method?: string
+        }
+        Relationships: []
+      }
       special_dates: {
         Row: {
           color: string
