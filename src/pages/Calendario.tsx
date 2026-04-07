@@ -9,24 +9,48 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+// Festivos oficiales Colombia 2026 (días no laborales - Ley Emiliani)
 const COLOMBIAN_HOLIDAYS: { month: number; day: number; name: string }[] = [
   { month: 1, day: 1, name: 'Año Nuevo' },
-  { month: 1, day: 6, name: 'Día de los Reyes Magos' },
-  { month: 3, day: 24, name: 'Día de San José' },
-  { month: 4, day: 17, name: 'Jueves Santo' },
-  { month: 4, day: 18, name: 'Viernes Santo' },
+  { month: 1, day: 12, name: 'Día de los Reyes Magos' },
+  { month: 3, day: 23, name: 'Día de San José' },
+  { month: 4, day: 2, name: 'Jueves Santo' },
+  { month: 4, day: 3, name: 'Viernes Santo' },
   { month: 5, day: 1, name: 'Día del Trabajo' },
-  { month: 6, day: 2, name: 'Ascensión del Señor' },
-  { month: 6, day: 23, name: 'Corpus Christi' },
-  { month: 6, day: 30, name: 'Sagrado Corazón' },
-  { month: 7, day: 20, name: 'Día de la Independencia' },
+  { month: 5, day: 18, name: 'Ascensión del Señor' },
+  { month: 6, day: 8, name: 'Corpus Christi' },
+  { month: 6, day: 15, name: 'Sagrado Corazón de Jesús' },
+  { month: 6, day: 29, name: 'San Pedro y San Pablo' },
+  { month: 7, day: 20, name: 'Independencia de Colombia' },
   { month: 8, day: 7, name: 'Batalla de Boyacá' },
-  { month: 8, day: 18, name: 'Asunción de la Virgen' },
-  { month: 10, day: 13, name: 'Día de la Raza' },
-  { month: 11, day: 3, name: 'Todos los Santos' },
-  { month: 11, day: 17, name: 'Independencia de Cartagena' },
+  { month: 8, day: 17, name: 'Asunción de la Virgen' },
+  { month: 10, day: 12, name: 'Día de la Diversidad Étnica y Cultural' },
+  { month: 11, day: 2, name: 'Todos los Santos' },
+  { month: 11, day: 16, name: 'Independencia de Cartagena' },
   { month: 12, day: 8, name: 'Inmaculada Concepción' },
   { month: 12, day: 25, name: 'Navidad' },
+];
+
+// Celebraciones locales (no son festivos, pero se celebran)
+const LOCAL_CELEBRATIONS: { month: number; day: number; name: string }[] = [
+  { month: 1, day: 31, name: 'Día de la Publicidad' },
+  { month: 2, day: 14, name: 'Día de San Valentín' },
+  { month: 3, day: 8, name: 'Día Internacional de la Mujer' },
+  { month: 3, day: 19, name: 'Día del Hombre' },
+  { month: 4, day: 22, name: 'Día de la Tierra' },
+  { month: 4, day: 23, name: 'Día del Idioma' },
+  { month: 4, day: 26, name: 'Día del Niño' },
+  { month: 5, day: 10, name: 'Día de la Madre' },
+  { month: 5, day: 15, name: 'Día del Maestro' },
+  { month: 6, day: 21, name: 'Día del Padre' },
+  { month: 7, day: 4, name: 'Día del Médico' },
+  { month: 8, day: 1, name: 'Día del Ejército Nacional' },
+  { month: 9, day: 7, name: 'Día del Amor y la Amistad' },
+  { month: 10, day: 31, name: 'Halloween' },
+  { month: 11, day: 1, name: 'Día de los Angelitos' },
+  { month: 12, day: 7, name: 'Día de las Velitas' },
+  { month: 12, day: 24, name: 'Nochebuena' },
+  { month: 12, day: 31, name: 'Nochevieja' },
 ];
 
 interface SpecialDate {
@@ -95,6 +119,14 @@ export default function CalendarioPage() {
     return m;
   }, []);
 
+  const celebrationMap = useMemo(() => {
+    const m = new Map<string, string>();
+    LOCAL_CELEBRATIONS.forEach(c => {
+      m.set(`${String(c.month).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`, c.name);
+    });
+    return m;
+  }, []);
+
   const specialMap = useMemo(() => {
     const m = new Map<string, SpecialDate[]>();
     specialDates.forEach(sd => {
@@ -157,9 +189,15 @@ export default function CalendarioPage() {
       const dateStr = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const mmdd = `${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const holiday = holidayMap.get(mmdd);
+      const celebration = celebrationMap.get(mmdd);
       const specials = specialMap.get(dateStr) || [];
       const isToday = dateStr === todayStr;
       const isWeekend = (firstDay + day - 1) % 7 >= 5;
+
+      const titleParts: string[] = [];
+      if (holiday) titleParts.push(`🚫 ${holiday}`);
+      if (celebration) titleParts.push(`🎉 ${celebration}`);
+      if (specials.length > 0) titleParts.push(...specials.map(s => s.name));
 
       cells.push(
         <div
@@ -168,16 +206,19 @@ export default function CalendarioPage() {
           className={`relative h-8 flex items-center justify-center rounded cursor-pointer text-xs font-medium transition-all duration-150
             ${isToday ? 'bg-primary text-primary-foreground font-bold ring-2 ring-primary/50' : ''}
             ${!isToday && holiday ? 'bg-destructive/15 text-destructive' : ''}
-            ${!isToday && !holiday && isWeekend ? 'text-muted-foreground/60' : ''}
-            ${!isToday && !holiday && !isWeekend ? 'text-foreground hover:bg-secondary' : ''}
+            ${!isToday && !holiday && celebration ? 'bg-accent/20 text-accent-foreground' : ''}
+            ${!isToday && !holiday && !celebration && isWeekend ? 'text-muted-foreground/60' : ''}
+            ${!isToday && !holiday && !celebration && !isWeekend ? 'text-foreground hover:bg-secondary' : ''}
             ${holiday ? 'hover:bg-destructive/25' : ''}
+            ${!holiday && celebration ? 'hover:bg-accent/30' : ''}
           `}
-          title={holiday ? `🎉 ${holiday}` : specials.length > 0 ? specials.map(s => s.name).join(', ') : undefined}
+          title={titleParts.length > 0 ? titleParts.join(' · ') : undefined}
         >
           {day}
-          {(holiday || specials.length > 0) && (
+          {(holiday || celebration || specials.length > 0) && (
             <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5">
               {holiday && <span className="w-1 h-1 rounded-full bg-destructive" />}
+              {celebration && <span className="w-1 h-1 rounded-full bg-accent" />}
               {specials.slice(0, 2).map(s => (
                 <span key={s.id} className={`w-1 h-1 rounded-full ${dotColorMap[s.color] || 'bg-primary'}`} />
               ))}
@@ -203,10 +244,14 @@ export default function CalendarioPage() {
   }
 
   const upcomingEvents = useMemo(() => {
-    const events: { date: string; name: string; type: 'holiday' | 'special'; color?: string; id?: string; sd?: SpecialDate }[] = [];
+    const events: { date: string; name: string; type: 'holiday' | 'celebration' | 'special'; color?: string; id?: string; sd?: SpecialDate }[] = [];
     COLOMBIAN_HOLIDAYS.forEach(h => {
       const dateStr = `${year}-${String(h.month).padStart(2, '0')}-${String(h.day).padStart(2, '0')}`;
       events.push({ date: dateStr, name: h.name, type: 'holiday' });
+    });
+    LOCAL_CELEBRATIONS.forEach(c => {
+      const dateStr = `${year}-${String(c.month).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`;
+      events.push({ date: dateStr, name: c.name, type: 'celebration' });
     });
     specialDates.filter(s => s.date.startsWith(`${year}-`)).forEach(s => {
       events.push({ date: s.date, name: s.name, type: 'special', color: s.color, id: s.id, sd: s });
@@ -253,7 +298,11 @@ export default function CalendarioPage() {
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
-                  <span className="text-muted-foreground">Festivo colombiano</span>
+                  <span className="text-muted-foreground">Festivo (no laborable)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-accent" />
+                  <span className="text-muted-foreground">Celebración</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-primary" />
@@ -286,6 +335,8 @@ export default function CalendarioPage() {
                         </div>
                         {ev.type === 'holiday' ? (
                           <PartyPopper className="h-3 w-3 text-destructive shrink-0 mt-0.5" />
+                        ) : ev.type === 'celebration' ? (
+                          <Star className="h-3 w-3 text-accent shrink-0 mt-0.5" />
                         ) : (
                           <div className="flex items-center gap-1 shrink-0">
                             <button className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => ev.sd && openEditDialog(ev.sd)}>
