@@ -30,7 +30,12 @@ import {
 const DAYS_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-function fmt(d: Date): string { return d.toISOString().split('T')[0]; }
+function fmt(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 function getWeekDays(date: Date): Date[] {
   const day = date.getDay();
@@ -317,7 +322,7 @@ export default function AgendaPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-card border-border max-w-md">
+        <DialogContent className="bg-card border-border max-w-sm">
           <DialogHeader>
             <DialogTitle>{editTask ? 'Editar Tarea' : 'Nueva Tarea'}</DialogTitle>
           </DialogHeader>
