@@ -189,9 +189,15 @@ export default function CalendarioPage() {
       const dateStr = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const mmdd = `${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const holiday = holidayMap.get(mmdd);
+      const celebration = celebrationMap.get(mmdd);
       const specials = specialMap.get(dateStr) || [];
       const isToday = dateStr === todayStr;
       const isWeekend = (firstDay + day - 1) % 7 >= 5;
+
+      const titleParts: string[] = [];
+      if (holiday) titleParts.push(`🚫 ${holiday}`);
+      if (celebration) titleParts.push(`🎉 ${celebration}`);
+      if (specials.length > 0) titleParts.push(...specials.map(s => s.name));
 
       cells.push(
         <div
@@ -200,11 +206,13 @@ export default function CalendarioPage() {
           className={`relative h-8 flex items-center justify-center rounded cursor-pointer text-xs font-medium transition-all duration-150
             ${isToday ? 'bg-primary text-primary-foreground font-bold ring-2 ring-primary/50' : ''}
             ${!isToday && holiday ? 'bg-destructive/15 text-destructive' : ''}
-            ${!isToday && !holiday && isWeekend ? 'text-muted-foreground/60' : ''}
-            ${!isToday && !holiday && !isWeekend ? 'text-foreground hover:bg-secondary' : ''}
+            ${!isToday && !holiday && celebration ? 'bg-accent/20 text-accent-foreground' : ''}
+            ${!isToday && !holiday && !celebration && isWeekend ? 'text-muted-foreground/60' : ''}
+            ${!isToday && !holiday && !celebration && !isWeekend ? 'text-foreground hover:bg-secondary' : ''}
             ${holiday ? 'hover:bg-destructive/25' : ''}
+            ${!holiday && celebration ? 'hover:bg-accent/30' : ''}
           `}
-          title={holiday ? `🎉 ${holiday}` : specials.length > 0 ? specials.map(s => s.name).join(', ') : undefined}
+          title={titleParts.length > 0 ? titleParts.join(' · ') : undefined}
         >
           {day}
           {(holiday || specials.length > 0) && (
