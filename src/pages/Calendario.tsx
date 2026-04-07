@@ -335,6 +335,8 @@ export default function CalendarioPage() {
                         </div>
                         {ev.type === 'holiday' ? (
                           <PartyPopper className="h-3 w-3 text-destructive shrink-0 mt-0.5" />
+                        ) : ev.type === 'celebration' ? (
+                          <Star className="h-3 w-3 text-accent shrink-0 mt-0.5" />
                         ) : (
                           <div className="flex items-center gap-1 shrink-0">
                             <button className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => ev.sd && openEditDialog(ev.sd)}>
