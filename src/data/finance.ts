@@ -84,7 +84,8 @@ export async function addIncome(income: Omit<Income, 'id' | 'created_at'>) {
   return data as Income;
 }
 export async function deleteIncome(id: string) {
-  await supabase.from('incomes').delete().eq('id', id);
+  const { error } = await supabase.from('incomes').delete().eq('id', id);
+  if (error) throw error;
 }
 
 export async function getExpenses() {
@@ -97,7 +98,8 @@ export async function addExpense(expense: Omit<Expense, 'id' | 'created_at'>) {
   return data as Expense;
 }
 export async function deleteExpense(id: string) {
-  await supabase.from('expenses').delete().eq('id', id);
+  const { error } = await supabase.from('expenses').delete().eq('id', id);
+  if (error) throw error;
 }
 
 export async function getWithdrawals() {
@@ -110,7 +112,8 @@ export async function addWithdrawal(w: Omit<ATMWithdrawal, 'id' | 'created_at'>)
   return data as ATMWithdrawal;
 }
 export async function deleteWithdrawal(id: string) {
-  await supabase.from('atm_withdrawals').delete().eq('id', id);
+  const { error } = await supabase.from('atm_withdrawals').delete().eq('id', id);
+  if (error) throw error;
 }
 
 export async function getCCTransactions() {
@@ -123,7 +126,8 @@ export async function addCCTransaction(t: Omit<CreditCardTransaction, 'id' | 'cr
   return data as CreditCardTransaction;
 }
 export async function deleteCCTransaction(id: string) {
-  await supabase.from('credit_card_transactions').delete().eq('id', id);
+  const { error } = await supabase.from('credit_card_transactions').delete().eq('id', id);
+  if (error) throw error;
 }
 
 export async function getDebts() {
@@ -140,7 +144,8 @@ export async function updateDebt(id: string, updates: Partial<Debt>) {
   if (error) throw error;
 }
 export async function deleteDebt(id: string) {
-  await supabase.from('debts').delete().eq('id', id);
+  const { error } = await supabase.from('debts').delete().eq('id', id);
+  if (error) throw error;
 }
 
 export async function getDebtPayments(debtId: string) {
@@ -150,14 +155,26 @@ export async function getDebtPayments(debtId: string) {
 export async function addDebtPayment(p: Omit<DebtPayment, 'id' | 'created_at'>) {
   const { data, error } = await supabase.from('debt_payments').insert(p).select().single();
   if (error) throw error;
-  // Update remaining amount on debt
-  const debt = (await supabase.from('debts').select('remaining_amount').eq('id', p.debt_id).single()).data;
+  // Update remaining amount on debt — fetch fresh data and update atomically
+  const { data: debt, error: fetchErr } = await supabase
+    .from('debts')
+    .select('remaining_amount, due_date')
+    .eq('id', p.debt_id)
+    .single();
+  if (fetchErr) throw fetchErr;
   if (debt) {
     const newRemaining = Math.max(0, Number(debt.remaining_amount) - p.amount);
-    await supabase.from('debts').update({
+    let status: 'paid' | 'active' | 'overdue' = 'active';
+    if (newRemaining <= 0) {
+      status = 'paid';
+    } else if (debt.due_date && new Date(debt.due_date) < new Date()) {
+      status = 'overdue';
+    }
+    const { error: updateErr } = await supabase.from('debts').update({
       remaining_amount: newRemaining,
-      status: newRemaining <= 0 ? 'paid' : 'active',
+      status,
     }).eq('id', p.debt_id);
+    if (updateErr) throw updateErr;
   }
   return data as DebtPayment;
 }

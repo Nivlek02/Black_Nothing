@@ -78,11 +78,16 @@ export default function FinanzasPage() {
   const [filterType, setFilterType] = useState('all');
 
   const loadAll = useCallback(async () => {
-    const [i, e, w, c, d, h] = await Promise.all([
-      getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(),
-    ]);
-    setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h);
-  }, []);
+    try {
+      const [i, e, w, c, d, h] = await Promise.all([
+        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(),
+      ]);
+      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h);
+    } catch (err) {
+      console.error('Error loading finance data:', err);
+      toast({ title: 'Error al cargar datos financieros', variant: 'destructive' });
+    }
+  }, [toast]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -95,7 +100,8 @@ export default function FinanzasPage() {
   const ccPayments = useMemo(() => ccTx.filter(t => t.transaction_type === 'payment').reduce((s, t) => s + Number(t.amount), 0), [ccTx]);
   const ccBalance = ccPurchases - ccPayments;
   const now = new Date();
-  const nextPayDate = new Date(now.getFullYear(), now.getDate() > 15 ? now.getMonth() + 1 : now.getMonth(), 15);
+  const ccCutDay = 15; // día de corte configurable
+  const nextPayDate = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > ccCutDay ? 1 : 0), ccCutDay);
 
   const resetForm = () => {
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
@@ -109,51 +115,65 @@ export default function FinanzasPage() {
   // Handlers
   const handleSaveIncome = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
-    await addIncome({ amount: Number(formAmount), category: formCategory || 'Otro', description: formDescription, payment_method: formMethod });
-    toast({ title: 'Ingreso registrado' });
-    setDialog(null); loadAll();
+    try {
+      await addIncome({ amount: Number(formAmount), category: formCategory || 'Otro', description: formDescription, payment_method: formMethod });
+      toast({ title: 'Ingreso registrado' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al registrar ingreso', variant: 'destructive' }); }
   };
   const handleSaveExpense = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
-    await addExpense({ amount: Number(formAmount), category: formCategory || 'Otro', expense_type: formExpenseType as 'fixed' | 'occasional', description: formDescription, payment_method: formMethod });
-    toast({ title: 'Gasto registrado' });
-    setDialog(null); loadAll();
+    try {
+      await addExpense({ amount: Number(formAmount), category: formCategory || 'Otro', expense_type: formExpenseType as 'fixed' | 'occasional', description: formDescription, payment_method: formMethod });
+      toast({ title: 'Gasto registrado' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al registrar gasto', variant: 'destructive' }); }
   };
   const handleSaveWithdrawal = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
-    await addWithdrawal({ amount: Number(formAmount), source: formSource, description: formDescription });
-    toast({ title: 'Retiro registrado' });
-    setDialog(null); loadAll();
+    try {
+      await addWithdrawal({ amount: Number(formAmount), source: formSource, description: formDescription });
+      toast({ title: 'Retiro registrado' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al registrar retiro', variant: 'destructive' }); }
   };
   const handleSaveCCTx = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
-    await addCCTransaction({ amount: Number(formAmount), transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: formDescription });
-    toast({ title: formCcType === 'purchase' ? 'Compra TC registrada' : 'Pago TC registrado' });
-    setDialog(null); loadAll();
+    try {
+      await addCCTransaction({ amount: Number(formAmount), transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: formDescription });
+      toast({ title: formCcType === 'purchase' ? 'Compra TC registrada' : 'Pago TC registrado' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al registrar movimiento TC', variant: 'destructive' }); }
   };
   const handleSaveDebt = async () => {
     if (!formDebtName || !formDebtTotal || Number(formDebtTotal) <= 0) return;
-    await addDebt({ name: formDebtName, total_amount: Number(formDebtTotal), remaining_amount: Number(formDebtTotal), start_date: formDebtStart, due_date: formDebtDue || formDebtStart, status: 'active', notes: formDebtNotes });
-    toast({ title: 'Deuda registrada' });
-    setDialog(null); loadAll();
+    try {
+      await addDebt({ name: formDebtName, total_amount: Number(formDebtTotal), remaining_amount: Number(formDebtTotal), start_date: formDebtStart, due_date: formDebtDue || formDebtStart, status: 'active', notes: formDebtNotes });
+      toast({ title: 'Deuda registrada' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al registrar deuda', variant: 'destructive' }); }
   };
   const handleSaveDebtPayment = async () => {
     if (!formDebtPayAmount || Number(formDebtPayAmount) <= 0 || !formDebtPayId) return;
-    await addDebtPayment({ debt_id: formDebtPayId, amount: Number(formDebtPayAmount), notes: formDebtPayNotes });
-    toast({ title: 'Abono registrado' });
-    setDialog(null); loadAll();
+    try {
+      await addDebtPayment({ debt_id: formDebtPayId, amount: Number(formDebtPayAmount), notes: formDebtPayNotes });
+      toast({ title: 'Abono registrado' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al registrar abono', variant: 'destructive' }); }
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const { type, id } = deleteTarget;
-    if (type === 'income') await deleteIncome(id);
-    else if (type === 'expense') await deleteExpense(id);
-    else if (type === 'withdrawal') await deleteWithdrawal(id);
-    else if (type === 'cc') await deleteCCTransaction(id);
-    else if (type === 'debt') await deleteDebt(id);
-    toast({ title: 'Eliminado correctamente' });
-    setDeleteTarget(null); loadAll();
+    try {
+      const { type, id } = deleteTarget;
+      if (type === 'income') await deleteIncome(id);
+      else if (type === 'expense') await deleteExpense(id);
+      else if (type === 'withdrawal') await deleteWithdrawal(id);
+      else if (type === 'cc') await deleteCCTransaction(id);
+      else if (type === 'debt') await deleteDebt(id);
+      toast({ title: 'Eliminado correctamente' });
+      setDeleteTarget(null); loadAll();
+    } catch { toast({ title: 'Error al eliminar', variant: 'destructive' }); }
   };
 
   const openDebtPayments = async (debtId: string) => {

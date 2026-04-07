@@ -32,7 +32,11 @@ export default function SettingsPage() {
   };
 
   const handleReset = () => {
-    localStorage.clear();
+    const keysToRemove = [
+      'cdc-reports', 'cdc-platforms', 'cdc-payments', 'cdc-config',
+      'cdc-subjects', 'cdc-activities', 'cdc-init',
+    ];
+    keysToRemove.forEach(key => localStorage.removeItem(key));
     toast({ title: 'Datos restablecidos', description: 'Recarga la página para ver los datos de ejemplo' });
   };
 

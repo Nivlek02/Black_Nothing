@@ -262,8 +262,12 @@ export default function UnadPage() {
                               <div key={item.id} className="flex items-center gap-2 group">
                                 <Checkbox checked={item.completed} onCheckedChange={(v) => updateCheckItem(act, item.id, { completed: !!v })} />
                                 <Input
-                                  value={item.text}
-                                  onChange={(e) => updateCheckItem(act, item.id, { text: e.target.value })}
+                                  defaultValue={item.text}
+                                  onBlur={(e) => {
+                                    if (e.target.value !== item.text) {
+                                      updateCheckItem(act, item.id, { text: e.target.value });
+                                    }
+                                  }}
                                   placeholder="Descripción de la tarea..."
                                   className={`h-8 text-sm flex-1 bg-transparent border-border/50 ${item.completed ? 'line-through text-muted-foreground' : ''}`}
                                 />
@@ -279,8 +283,12 @@ export default function UnadPage() {
                           <div className="space-y-1">
                             <h4 className="text-sm font-semibold text-foreground">Notas</h4>
                             <Textarea
-                              value={act.notes}
-                              onChange={(e) => updateNotes(act, e.target.value)}
+                              defaultValue={act.notes}
+                              onBlur={(e) => {
+                                if (e.target.value !== act.notes) {
+                                  updateNotes(act, e.target.value);
+                                }
+                              }}
                               placeholder="Agregar notas o comentarios..."
                               className="min-h-[60px] text-sm bg-secondary/30 border-border/50"
                             />

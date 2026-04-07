@@ -6,7 +6,12 @@ import { getTasksForDate, AgendaTask } from '@/data/agenda';
 import { getTotalIncomes, getTotalExpenses } from '@/data/finance';
 import NotificationSettings from '@/components/NotificationSettings';
 
-function fmt(d: Date): string { return d.toISOString().split('T')[0]; }
+function fmt(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function fmtCurrency(n: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
 }

@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   AgendaTask,
   getTasksForDate,
+  getTasksForDateRange,
   getOverdueTasks,
   saveAgendaTask,
   deleteAgendaTask,
@@ -94,20 +95,28 @@ export default function AgendaPage() {
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
-    const dayTasks = await getTasksForDate(dateStr);
-    setTasks(dayTasks);
+    try {
+      const [dayTasks, overdue, weekAllTasks] = await Promise.all([
+        getTasksForDate(dateStr),
+        getOverdueTasks(today),
+        getTasksForDateRange(fmt(weekDays[0]), fmt(weekDays[6])),
+      ]);
+      setTasks(dayTasks);
+      setOverdueTasks(overdue);
 
-    const overdue = await getOverdueTasks(today);
-    setOverdueTasks(overdue);
-
-    const wt: Record<string, AgendaTask[]> = {};
-    await Promise.all(weekDays.map(async d => {
-      const ds = fmt(d);
-      wt[ds] = await getTasksForDate(ds);
-    }));
-    setWeekTasks(wt);
-    setLoading(false);
-  }, [dateStr, weekDays, today]);
+      const wt: Record<string, AgendaTask[]> = {};
+      weekAllTasks.forEach(t => {
+        if (!wt[t.date]) wt[t.date] = [];
+        wt[t.date].push(t);
+      });
+      setWeekTasks(wt);
+    } catch (err) {
+      console.error('Error loading tasks:', err);
+      toast({ title: 'Error al cargar tareas', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }, [dateStr, weekDays, today, toast]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
@@ -139,6 +148,10 @@ export default function AgendaPage() {
 
   const handleSave = async () => {
     if (!formTitle.trim()) return;
+    if (formStart >= formEnd) {
+      toast({ title: 'La hora de inicio debe ser anterior a la hora de fin', variant: 'destructive' });
+      return;
+    }
     try {
       const targetDate = fmt(formDate);
       if (editTask) {
@@ -155,10 +168,12 @@ export default function AgendaPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await deleteAgendaTask(deleteId);
-    setDeleteId(null);
-    toast({ title: 'Tarea eliminada' });
-    loadTasks();
+    try {
+      await deleteAgendaTask(deleteId);
+      setDeleteId(null);
+      toast({ title: 'Tarea eliminada' });
+      loadTasks();
+    } catch { toast({ title: 'Error al eliminar tarea', variant: 'destructive' }); }
   };
 
   const toggleComplete = async (task: AgendaTask) => {

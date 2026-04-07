@@ -63,7 +63,7 @@ export async function getAgendaTasks(): Promise<AgendaTask[]> {
     .select('*')
     .order('date', { ascending: true })
     .order('start_time', { ascending: true });
-  if (error) { console.error(error); return []; }
+  if (error) throw error;
   return (data || []).map(mapRow);
 }
 
@@ -73,7 +73,19 @@ export async function getTasksForDate(date: string): Promise<AgendaTask[]> {
     .select('*')
     .eq('date', date)
     .order('start_time', { ascending: true });
-  if (error) { console.error(error); return []; }
+  if (error) throw error;
+  return (data || []).map(mapRow);
+}
+
+export async function getTasksForDateRange(startDate: string, endDate: string): Promise<AgendaTask[]> {
+  const { data, error } = await supabase
+    .from('agenda_tasks')
+    .select('*')
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date', { ascending: true })
+    .order('start_time', { ascending: true });
+  if (error) throw error;
   return (data || []).map(mapRow);
 }
 
@@ -85,7 +97,7 @@ export async function getOverdueTasks(beforeDate: string): Promise<AgendaTask[]>
     .eq('completed', false)
     .order('date', { ascending: false })
     .order('start_time', { ascending: true });
-  if (error) { console.error(error); return []; }
+  if (error) throw error;
   return (data || []).map(mapRow);
 }
 
@@ -104,12 +116,12 @@ export async function saveAgendaTask(task: AgendaTask): Promise<void> {
       reminder_minutes: task.reminderMinutes,
       notified: task.notified,
     });
-  if (error) console.error(error);
+  if (error) throw error;
 }
 
 export async function deleteAgendaTask(id: string): Promise<void> {
   const { error } = await supabase.from('agenda_tasks').delete().eq('id', id);
-  if (error) console.error(error);
+  if (error) throw error;
 }
 
 export async function createAgendaTask(data: Omit<AgendaTask, 'id' | 'createdAt' | 'completed' | 'notified'>): Promise<AgendaTask> {
