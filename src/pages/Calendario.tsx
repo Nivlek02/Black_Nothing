@@ -298,7 +298,11 @@ export default function CalendarioPage() {
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
-                  <span className="text-muted-foreground">Festivo colombiano</span>
+                  <span className="text-muted-foreground">Festivo (no laborable)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-accent" />
+                  <span className="text-muted-foreground">Celebración</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-primary" />
