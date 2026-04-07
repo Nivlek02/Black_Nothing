@@ -322,7 +322,7 @@ export default function AgendaPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-card border-border max-w-md">
+        <<DialogContent className="bg-card border-border max-w-sm">
           <DialogHeader>
             <DialogTitle>{editTask ? 'Editar Tarea' : 'Nueva Tarea'}</DialogTitle>
           </DialogHeader>
