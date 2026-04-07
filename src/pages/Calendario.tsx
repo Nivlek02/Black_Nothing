@@ -9,24 +9,48 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+// Festivos oficiales Colombia 2026 (días no laborales - Ley Emiliani)
 const COLOMBIAN_HOLIDAYS: { month: number; day: number; name: string }[] = [
   { month: 1, day: 1, name: 'Año Nuevo' },
-  { month: 1, day: 6, name: 'Día de los Reyes Magos' },
-  { month: 3, day: 24, name: 'Día de San José' },
-  { month: 4, day: 17, name: 'Jueves Santo' },
-  { month: 4, day: 18, name: 'Viernes Santo' },
+  { month: 1, day: 12, name: 'Día de los Reyes Magos' },
+  { month: 3, day: 23, name: 'Día de San José' },
+  { month: 4, day: 2, name: 'Jueves Santo' },
+  { month: 4, day: 3, name: 'Viernes Santo' },
   { month: 5, day: 1, name: 'Día del Trabajo' },
-  { month: 6, day: 2, name: 'Ascensión del Señor' },
-  { month: 6, day: 23, name: 'Corpus Christi' },
-  { month: 6, day: 30, name: 'Sagrado Corazón' },
-  { month: 7, day: 20, name: 'Día de la Independencia' },
+  { month: 5, day: 18, name: 'Ascensión del Señor' },
+  { month: 6, day: 8, name: 'Corpus Christi' },
+  { month: 6, day: 15, name: 'Sagrado Corazón de Jesús' },
+  { month: 6, day: 29, name: 'San Pedro y San Pablo' },
+  { month: 7, day: 20, name: 'Independencia de Colombia' },
   { month: 8, day: 7, name: 'Batalla de Boyacá' },
-  { month: 8, day: 18, name: 'Asunción de la Virgen' },
-  { month: 10, day: 13, name: 'Día de la Raza' },
-  { month: 11, day: 3, name: 'Todos los Santos' },
-  { month: 11, day: 17, name: 'Independencia de Cartagena' },
+  { month: 8, day: 17, name: 'Asunción de la Virgen' },
+  { month: 10, day: 12, name: 'Día de la Diversidad Étnica y Cultural' },
+  { month: 11, day: 2, name: 'Todos los Santos' },
+  { month: 11, day: 16, name: 'Independencia de Cartagena' },
   { month: 12, day: 8, name: 'Inmaculada Concepción' },
   { month: 12, day: 25, name: 'Navidad' },
+];
+
+// Celebraciones locales (no son festivos, pero se celebran)
+const LOCAL_CELEBRATIONS: { month: number; day: number; name: string }[] = [
+  { month: 1, day: 31, name: 'Día de la Publicidad' },
+  { month: 2, day: 14, name: 'Día de San Valentín' },
+  { month: 3, day: 8, name: 'Día Internacional de la Mujer' },
+  { month: 3, day: 19, name: 'Día del Hombre' },
+  { month: 4, day: 22, name: 'Día de la Tierra' },
+  { month: 4, day: 23, name: 'Día del Idioma' },
+  { month: 4, day: 26, name: 'Día del Niño' },
+  { month: 5, day: 10, name: 'Día de la Madre' },
+  { month: 5, day: 15, name: 'Día del Maestro' },
+  { month: 6, day: 21, name: 'Día del Padre' },
+  { month: 7, day: 4, name: 'Día del Médico' },
+  { month: 8, day: 1, name: 'Día del Ejército Nacional' },
+  { month: 9, day: 7, name: 'Día del Amor y la Amistad' },
+  { month: 10, day: 31, name: 'Halloween' },
+  { month: 11, day: 1, name: 'Día de los Angelitos' },
+  { month: 12, day: 7, name: 'Día de las Velitas' },
+  { month: 12, day: 24, name: 'Nochebuena' },
+  { month: 12, day: 31, name: 'Nochevieja' },
 ];
 
 interface SpecialDate {
