@@ -244,10 +244,14 @@ export default function CalendarioPage() {
   }
 
   const upcomingEvents = useMemo(() => {
-    const events: { date: string; name: string; type: 'holiday' | 'special'; color?: string; id?: string; sd?: SpecialDate }[] = [];
+    const events: { date: string; name: string; type: 'holiday' | 'celebration' | 'special'; color?: string; id?: string; sd?: SpecialDate }[] = [];
     COLOMBIAN_HOLIDAYS.forEach(h => {
       const dateStr = `${year}-${String(h.month).padStart(2, '0')}-${String(h.day).padStart(2, '0')}`;
       events.push({ date: dateStr, name: h.name, type: 'holiday' });
+    });
+    LOCAL_CELEBRATIONS.forEach(c => {
+      const dateStr = `${year}-${String(c.month).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`;
+      events.push({ date: dateStr, name: c.name, type: 'celebration' });
     });
     specialDates.filter(s => s.date.startsWith(`${year}-`)).forEach(s => {
       events.push({ date: s.date, name: s.name, type: 'special', color: s.color, id: s.id, sd: s });
