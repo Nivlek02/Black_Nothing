@@ -215,9 +215,10 @@ export default function CalendarioPage() {
           title={titleParts.length > 0 ? titleParts.join(' · ') : undefined}
         >
           {day}
-          {(holiday || specials.length > 0) && (
+          {(holiday || celebration || specials.length > 0) && (
             <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5">
               {holiday && <span className="w-1 h-1 rounded-full bg-destructive" />}
+              {celebration && <span className="w-1 h-1 rounded-full bg-accent" />}
               {specials.slice(0, 2).map(s => (
                 <span key={s.id} className={`w-1 h-1 rounded-full ${dotColorMap[s.color] || 'bg-primary'}`} />
               ))}
