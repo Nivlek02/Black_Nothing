@@ -119,6 +119,14 @@ export default function CalendarioPage() {
     return m;
   }, []);
 
+  const celebrationMap = useMemo(() => {
+    const m = new Map<string, string>();
+    LOCAL_CELEBRATIONS.forEach(c => {
+      m.set(`${String(c.month).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`, c.name);
+    });
+    return m;
+  }, []);
+
   const specialMap = useMemo(() => {
     const m = new Map<string, SpecialDate[]>();
     specialDates.forEach(sd => {
