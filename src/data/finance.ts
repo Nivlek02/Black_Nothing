@@ -269,3 +269,94 @@ export async function deleteUpcomingPayment(id: string) {
 }
 
 export const UPCOMING_PAYMENT_CATEGORIES = ['Servicios', 'Arriendo', 'Suscripción', 'Crédito', 'Seguro', 'Educación', 'Otro'];
+
+// Generate recurring payment instances
+export function generateRecurringInstances(payments: UpcomingPayment[]): UpcomingPayment[] {
+  const result: UpcomingPayment[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (const p of payments) {
+    if (p.frequency === 'once') {
+      result.push(p);
+      continue;
+    }
+
+    const endDate = p.recurrence_end ? new Date(p.recurrence_end + 'T12:00:00') : new Date(today.getFullYear(), today.getMonth() + 6, today.getDate());
+    let current = new Date(p.due_date + 'T12:00:00');
+    const increment = p.frequency === 'monthly' ? 1 : 0.5; // months
+
+    let idx = 0;
+    while (current <= endDate) {
+      const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+      result.push({
+        ...p,
+        id: idx === 0 ? p.id : `${p.id}_r${idx}`,
+        due_date: dateStr,
+        is_paid: idx === 0 ? p.is_paid : false,
+      });
+      idx++;
+      if (p.frequency === 'monthly') {
+        current = new Date(current.getFullYear(), current.getMonth() + 1, current.getDate());
+      } else {
+        // biweekly: add 15 days
+        current = new Date(current.getTime() + 15 * 24 * 60 * 60 * 1000);
+      }
+    }
+  }
+
+  result.sort((a, b) => a.due_date.localeCompare(b.due_date));
+  return result;
+}
+
+// Get next quincena date (15 or 30/end-of-month)
+export function getNextQuincena(): Date {
+  const today = new Date();
+  const day = today.getDate();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+
+  if (day <= 15) {
+    return new Date(year, month, 15);
+  } else {
+    // Last day of current month
+    return new Date(year, month + 1, 0);
+  }
+}
+
+// Savings CRUD
+export async function getSavings() {
+  const { data } = await supabase.from('savings').select('*').order('created_at', { ascending: false });
+  return (data ?? []) as Savings[];
+}
+export async function addSavings(s: Omit<Savings, 'id' | 'created_at'>) {
+  const { data, error } = await supabase.from('savings').insert(s).select().single();
+  if (error) throw error;
+  return data as Savings;
+}
+export async function updateSavings(id: string, updates: Partial<Savings>) {
+  const { error } = await supabase.from('savings').update(updates).eq('id', id);
+  if (error) throw error;
+}
+export async function deleteSavings(id: string) {
+  const { error } = await supabase.from('savings').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getSavingsMovements(savingsId: string) {
+  const { data } = await supabase.from('savings_movements').select('*').eq('savings_id', savingsId).order('created_at', { ascending: false });
+  return (data ?? []) as SavingsMovement[];
+}
+export async function addSavingsMovement(m: Omit<SavingsMovement, 'id' | 'created_at'>) {
+  const { data, error } = await supabase.from('savings_movements').insert(m).select().single();
+  if (error) throw error;
+  // Update current_amount on savings
+  const { data: saving, error: fetchErr } = await supabase.from('savings').select('current_amount').eq('id', m.savings_id).single();
+  if (fetchErr) throw fetchErr;
+  if (saving) {
+    const delta = m.movement_type === 'deposit' ? m.amount : -m.amount;
+    const newAmount = Math.max(0, Number(saving.current_amount) + delta);
+    await supabase.from('savings').update({ current_amount: newAmount }).eq('id', m.savings_id);
+  }
+  return data as SavingsMovement;
+}
