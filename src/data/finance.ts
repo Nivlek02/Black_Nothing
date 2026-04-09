@@ -57,6 +57,26 @@ export interface UpcomingPayment {
   category: string;
   is_paid: boolean;
   notes: string;
+  frequency: 'once' | 'biweekly' | 'monthly';
+  recurrence_end: string | null;
+  created_at: string;
+}
+
+export interface Savings {
+  id: string;
+  name: string;
+  target_amount: number;
+  current_amount: number;
+  notes: string;
+  created_at: string;
+}
+
+export interface SavingsMovement {
+  id: string;
+  savings_id: string;
+  amount: number;
+  movement_type: 'deposit' | 'withdrawal';
+  notes: string;
   created_at: string;
 }
 
