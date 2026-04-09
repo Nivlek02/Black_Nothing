@@ -103,6 +103,11 @@ export const INCOME_CATEGORIES = ['Salario', 'Freelance', 'Ventas', 'Transferenc
 export const EXPENSE_CATEGORIES = ['Alimentación', 'Transporte', 'Servicios', 'Entretenimiento', 'Salud', 'Educación', 'Ropa', 'Hogar', 'Otro'];
 export const PAYMENT_METHODS = ['Efectivo', 'Transferencia', 'Nequi', 'Daviplata', 'Débito', 'Otro'];
 export const ATM_SOURCES = ['Cuenta principal', 'Cuenta ahorros', 'Nequi', 'Daviplata', 'Otro'];
+export const PAYMENT_FREQUENCIES = [
+  { value: 'once', label: 'Una vez' },
+  { value: 'biweekly', label: 'Quincenal' },
+  { value: 'monthly', label: 'Mensual' },
+] as const;
 
 // CRUD Functions
 export async function getIncomes() {
