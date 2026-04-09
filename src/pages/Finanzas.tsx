@@ -10,15 +10,16 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, TrendingUp, TrendingDown, CreditCard, Landmark, PiggyBank, Plus,
   Trash2, ArrowUpCircle, ArrowDownCircle, Banknote, Receipt, HandCoins, History,
-  Calendar as CalIcon
+  Calendar as CalIcon, CheckCircle2, Clock
 } from 'lucide-react';
 import {
-  Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement,
-  INCOME_CATEGORIES, EXPENSE_CATEGORIES, PAYMENT_METHODS, ATM_SOURCES, MOVEMENT_TYPE_LABELS,
+  Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement, UpcomingPayment,
+  INCOME_CATEGORIES, EXPENSE_CATEGORIES, PAYMENT_METHODS, ATM_SOURCES, MOVEMENT_TYPE_LABELS, UPCOMING_PAYMENT_CATEGORIES,
   getIncomes, addIncome, deleteIncome,
   getExpenses, addExpense, deleteExpense,
   getWithdrawals, addWithdrawal, deleteWithdrawal,
@@ -26,6 +27,7 @@ import {
   getDebts, addDebt, updateDebt, deleteDebt,
   getDebtPayments, addDebtPayment,
   getMovementHistory,
+  getUpcomingPayments, addUpcomingPayment, updateUpcomingPayment, deleteUpcomingPayment,
 } from '@/data/finance';
 
 function fmt(n: number) {
@@ -33,6 +35,27 @@ function fmt(n: number) {
 }
 function fmtDate(d: string) {
   return new Date(d).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function fmtShortDate(d: string) {
+  return new Date(d + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+}
+
+function daysUntil(dateStr: string) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr + 'T12:00:00');
+  target.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/** Wrapper to make tables horizontally scrollable on mobile */
+function MobileTable({ children }: { children: React.ReactNode }) {
+  return (
+    <ScrollArea className="w-full whitespace-nowrap">
+      <div className="min-w-[600px]">{children}</div>
+      <ScrollBar orientation="horizontal" />
+    </ScrollArea>
+  );
 }
 
 export default function FinanzasPage() {
@@ -46,6 +69,7 @@ export default function FinanzasPage() {
   const [ccTx, setCcTx] = useState<CreditCardTransaction[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [history, setHistory] = useState<FinanceMovement[]>([]);
+  const [upcomingPayments, setUpcomingPayments] = useState<UpcomingPayment[]>([]);
 
   // Dialogs
   const [dialog, setDialog] = useState<string | null>(null);
@@ -73,16 +97,22 @@ export default function FinanzasPage() {
   const [formDebtPayAmount, setFormDebtPayAmount] = useState('');
   const [formDebtPayNotes, setFormDebtPayNotes] = useState('');
   const [formDebtPayId, setFormDebtPayId] = useState('');
+  // Upcoming payment form
+  const [formUpName, setFormUpName] = useState('');
+  const [formUpAmount, setFormUpAmount] = useState('');
+  const [formUpDate, setFormUpDate] = useState('');
+  const [formUpCategory, setFormUpCategory] = useState('Otro');
+  const [formUpNotes, setFormUpNotes] = useState('');
 
   // History filters
   const [filterType, setFilterType] = useState('all');
 
   const loadAll = useCallback(async () => {
     try {
-      const [i, e, w, c, d, h] = await Promise.all([
-        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(),
+      const [i, e, w, c, d, h, up] = await Promise.all([
+        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(),
       ]);
-      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h);
+      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up);
     } catch (err) {
       console.error('Error loading finance data:', err);
       toast({ title: 'Error al cargar datos financieros', variant: 'destructive' });
@@ -100,8 +130,10 @@ export default function FinanzasPage() {
   const ccPayments = useMemo(() => ccTx.filter(t => t.transaction_type === 'payment').reduce((s, t) => s + Number(t.amount), 0), [ccTx]);
   const ccBalance = ccPurchases - ccPayments;
   const now = new Date();
-  const ccCutDay = 15; // día de corte configurable
+  const ccCutDay = 15;
   const nextPayDate = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > ccCutDay ? 1 : 0), ccCutDay);
+
+  const pendingPayments = useMemo(() => upcomingPayments.filter(p => !p.is_paid), [upcomingPayments]);
 
   const resetForm = () => {
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
@@ -109,6 +141,7 @@ export default function FinanzasPage() {
     setFormDebtName(''); setFormDebtTotal(''); setFormDebtStart(new Date().toISOString().split('T')[0]);
     setFormDebtDue(''); setFormDebtNotes('');
     setFormDebtPayAmount(''); setFormDebtPayNotes(''); setFormDebtPayId('');
+    setFormUpName(''); setFormUpAmount(''); setFormUpDate(''); setFormUpCategory('Otro'); setFormUpNotes('');
   };
   const openDialog = (type: string) => { resetForm(); setDialog(type); };
 
@@ -161,6 +194,21 @@ export default function FinanzasPage() {
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar abono', variant: 'destructive' }); }
   };
+  const handleSaveUpcomingPayment = async () => {
+    if (!formUpName || !formUpAmount || !formUpDate || Number(formUpAmount) <= 0) return;
+    try {
+      await addUpcomingPayment({ name: formUpName, amount: Number(formUpAmount), due_date: formUpDate, category: formUpCategory, is_paid: false, notes: formUpNotes });
+      toast({ title: 'Pago programado registrado' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al registrar pago', variant: 'destructive' }); }
+  };
+  const handleTogglePaid = async (p: UpcomingPayment) => {
+    try {
+      await updateUpcomingPayment(p.id, { is_paid: !p.is_paid });
+      toast({ title: p.is_paid ? 'Marcado como pendiente' : 'Marcado como pagado' });
+      loadAll();
+    } catch { toast({ title: 'Error al actualizar', variant: 'destructive' }); }
+  };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -171,6 +219,7 @@ export default function FinanzasPage() {
       else if (type === 'withdrawal') await deleteWithdrawal(id);
       else if (type === 'cc') await deleteCCTransaction(id);
       else if (type === 'debt') await deleteDebt(id);
+      else if (type === 'upcoming') await deleteUpcomingPayment(id);
       toast({ title: 'Eliminado correctamente' });
       setDeleteTarget(null); loadAll();
     } catch { toast({ title: 'Error al eliminar', variant: 'destructive' }); }
@@ -192,68 +241,157 @@ export default function FinanzasPage() {
     { label: 'Ingreso', icon: ArrowUpCircle, color: 'text-green-400', action: () => openDialog('income') },
     { label: 'Gasto', icon: ArrowDownCircle, color: 'text-red-400', action: () => openDialog('expense') },
     { label: 'Retiro', icon: Banknote, color: 'text-yellow-400', action: () => openDialog('withdrawal') },
-    { label: 'Compra TC', icon: CreditCard, color: 'text-accent', action: () => { setFormCcType('purchase'); openDialog('cc'); } },
+    { label: 'TC', icon: CreditCard, color: 'text-accent', action: () => { setFormCcType('purchase'); openDialog('cc'); } },
     { label: 'Pago TC', icon: Receipt, color: 'text-primary', action: () => { setFormCcType('payment'); openDialog('cc'); } },
     { label: 'Deuda', icon: PiggyBank, color: 'text-orange-400', action: () => openDialog('debt') },
     { label: 'Abono', icon: HandCoins, color: 'text-emerald-400', action: () => openDialog('debtpayment') },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Finanzas Personales</h1>
-        <p className="text-sm text-muted-foreground">Gestión de ingresos, gastos, tarjeta de crédito y deudas</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground">Finanzas Personales</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">Gestión de ingresos, gastos, tarjeta de crédito y deudas</p>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-        {quickActions.map(qa => (
-          <Button key={qa.label} variant="outline" className="flex flex-col gap-1 h-auto py-3 px-2" onClick={qa.action}>
-            <qa.icon className={`h-5 w-5 ${qa.color}`} />
-            <span className="text-xs">{qa.label}</span>
-          </Button>
-        ))}
-      </div>
+      {/* Quick Actions — scrollable on mobile */}
+      <ScrollArea className="w-full">
+        <div className="flex gap-2 pb-2">
+          {quickActions.map(qa => (
+            <Button key={qa.label} variant="outline" className="flex flex-col gap-1 h-auto py-2.5 px-3 min-w-[70px] shrink-0" onClick={qa.action}>
+              <qa.icon className={`h-4 w-4 ${qa.color}`} />
+              <span className="text-[10px] sm:text-xs">{qa.label}</span>
+            </Button>
+          ))}
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full">
-          <TabsTrigger value="overview">Resumen</TabsTrigger>
-          <TabsTrigger value="incomes">Ingresos</TabsTrigger>
-          <TabsTrigger value="expenses">Gastos</TabsTrigger>
-          <TabsTrigger value="cc">Tarjeta</TabsTrigger>
-          <TabsTrigger value="debts">Deudas</TabsTrigger>
-          <TabsTrigger value="history">Historial</TabsTrigger>
-        </TabsList>
+        <ScrollArea className="w-full">
+          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-7 sm:w-full">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm">Resumen</TabsTrigger>
+            <TabsTrigger value="upcoming" className="text-xs sm:text-sm">Pagos</TabsTrigger>
+            <TabsTrigger value="incomes" className="text-xs sm:text-sm">Ingresos</TabsTrigger>
+            <TabsTrigger value="expenses" className="text-xs sm:text-sm">Gastos</TabsTrigger>
+            <TabsTrigger value="cc" className="text-xs sm:text-sm">Tarjeta</TabsTrigger>
+            <TabsTrigger value="debts" className="text-xs sm:text-sm">Deudas</TabsTrigger>
+            <TabsTrigger value="history" className="text-xs sm:text-sm">Historial</TabsTrigger>
+          </TabsList>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
 
         {/* OVERVIEW */}
         <TabsContent value="overview" className="space-y-4 mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Card className="card-metallic">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4 text-green-400" /> Ingresos</CardTitle></CardHeader>
-              <CardContent><p className="text-2xl font-bold font-mono-data text-green-400">{fmt(totalIncome)}</p></CardContent>
+              <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-2"><TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" /> Ingresos</CardTitle></CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0"><p className="text-lg sm:text-2xl font-bold font-mono-data text-green-400">{fmt(totalIncome)}</p></CardContent>
             </Card>
             <Card className="card-metallic">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><TrendingDown className="h-4 w-4 text-red-400" /> Gastos</CardTitle></CardHeader>
-              <CardContent><p className="text-2xl font-bold font-mono-data text-red-400">{fmt(totalExpense)}</p></CardContent>
+              <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-2"><TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-red-400" /> Gastos</CardTitle></CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0"><p className="text-lg sm:text-2xl font-bold font-mono-data text-red-400">{fmt(totalExpense)}</p></CardContent>
             </Card>
             <Card className="card-metallic">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><Banknote className="h-4 w-4 text-yellow-400" /> Retiros</CardTitle></CardHeader>
-              <CardContent><p className="text-2xl font-bold font-mono-data text-yellow-400">{fmt(totalWithdrawals)}</p></CardContent>
+              <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-2"><Banknote className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-400" /> Retiros</CardTitle></CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0"><p className="text-lg sm:text-2xl font-bold font-mono-data text-yellow-400">{fmt(totalWithdrawals)}</p></CardContent>
             </Card>
             <Card className="card-metallic">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><CreditCard className="h-4 w-4 text-accent" /> Saldo TC</CardTitle></CardHeader>
-              <CardContent><p className="text-2xl font-bold font-mono-data text-accent">{fmt(ccBalance)}</p></CardContent>
+              <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-2"><CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-accent" /> Saldo TC</CardTitle></CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0"><p className="text-lg sm:text-2xl font-bold font-mono-data text-accent">{fmt(ccBalance)}</p></CardContent>
             </Card>
           </div>
           <Card className="card-metallic">
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><DollarSign className="h-4 w-4 text-primary" /> Balance Neto</CardTitle></CardHeader>
             <CardContent>
-              <p className={`text-3xl font-bold font-mono-data ${totalIncome - totalExpense - totalWithdrawals >= 0 ? 'text-primary' : 'text-destructive'}`}>
+              <p className={`text-2xl sm:text-3xl font-bold font-mono-data ${totalIncome - totalExpense - totalWithdrawals >= 0 ? 'text-primary' : 'text-destructive'}`}>
                 {fmt(totalIncome - totalExpense - totalWithdrawals)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">Ingresos − Gastos − Retiros</p>
             </CardContent>
           </Card>
+
+          {/* Upcoming payments preview in overview */}
+          {pendingPayments.length > 0 && (
+            <Card className="card-metallic">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-warning" /> Próximos Pagos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {pendingPayments.slice(0, 4).map(p => {
+                  const days = daysUntil(p.due_date);
+                  return (
+                    <div key={p.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Badge variant={days <= 3 ? 'destructive' : days <= 7 ? 'secondary' : 'outline'} className="text-[10px] shrink-0">
+                          {days <= 0 ? 'Hoy' : days === 1 ? 'Mañana' : `${days}d`}
+                        </Badge>
+                        <span className="text-sm truncate">{p.name}</span>
+                      </div>
+                      <span className="font-mono-data text-sm text-warning shrink-0 ml-2">{fmt(p.amount)}</span>
+                    </div>
+                  );
+                })}
+                {pendingPayments.length > 4 && (
+                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setTab('upcoming')}>
+                    Ver todos ({pendingPayments.length})
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* UPCOMING PAYMENTS */}
+        <TabsContent value="upcoming" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-foreground">Próximos Pagos</h2>
+            <Button size="sm" onClick={() => openDialog('upcoming')}><Plus className="h-4 w-4 mr-1" /> Agregar</Button>
+          </div>
+          {upcomingPayments.length === 0 && (
+            <Card className="card-metallic"><CardContent className="py-8 text-center text-muted-foreground">Sin pagos programados</CardContent></Card>
+          )}
+          <div className="grid gap-3">
+            {upcomingPayments.map(p => {
+              const days = daysUntil(p.due_date);
+              return (
+                <Card key={p.id} className={`card-metallic ${p.is_paid ? 'opacity-60' : ''}`}>
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className={`font-semibold text-foreground ${p.is_paid ? 'line-through' : ''}`}>{p.name}</p>
+                          <Badge variant="outline" className="text-[10px]">{p.category}</Badge>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <CalIcon className="h-3 w-3" />
+                          <span>{fmtShortDate(p.due_date)}</span>
+                          {!p.is_paid && (
+                            <Badge variant={days <= 0 ? 'destructive' : days <= 3 ? 'destructive' : days <= 7 ? 'secondary' : 'outline'} className="text-[10px]">
+                              {days < 0 ? `Vencido hace ${Math.abs(days)}d` : days === 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días`}
+                            </Badge>
+                          )}
+                          {p.is_paid && <Badge className="text-[10px] bg-green-600">Pagado</Badge>}
+                        </div>
+                        {p.notes && <p className="text-xs text-muted-foreground mt-1">{p.notes}</p>}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <p className="font-mono-data text-sm font-semibold text-warning">{fmt(p.amount)}</p>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleTogglePaid(p)}>
+                          <CheckCircle2 className={`h-4 w-4 ${p.is_paid ? 'text-green-400' : 'text-muted-foreground'}`} />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDeleteTarget({ type: 'upcoming', id: p.id })}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </TabsContent>
 
         {/* INCOMES */}
@@ -264,22 +402,24 @@ export default function FinanzasPage() {
           </div>
           <Card className="card-metallic">
             <CardContent className="p-0">
-              <Table>
-                <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Categoría</TableHead><TableHead>Método</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {incomes.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin ingresos registrados</TableCell></TableRow>}
-                  {incomes.map(i => (
-                    <TableRow key={i.id}>
-                      <TableCell className="font-mono-data text-xs">{fmtDate(i.created_at)}</TableCell>
-                      <TableCell><Badge variant="secondary">{i.category}</Badge></TableCell>
-                      <TableCell className="text-sm">{i.payment_method}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{i.description}</TableCell>
-                      <TableCell className="text-right font-mono-data text-green-400">{fmt(Number(i.amount))}</TableCell>
-                      <TableCell><Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'income', id: i.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <MobileTable>
+                <Table>
+                  <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Categoría</TableHead><TableHead>Método</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {incomes.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin ingresos registrados</TableCell></TableRow>}
+                    {incomes.map(i => (
+                      <TableRow key={i.id}>
+                        <TableCell className="font-mono-data text-xs">{fmtDate(i.created_at)}</TableCell>
+                        <TableCell><Badge variant="secondary">{i.category}</Badge></TableCell>
+                        <TableCell className="text-sm">{i.payment_method}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{i.description}</TableCell>
+                        <TableCell className="text-right font-mono-data text-green-400">{fmt(Number(i.amount))}</TableCell>
+                        <TableCell><Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'income', id: i.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </MobileTable>
             </CardContent>
           </Card>
         </TabsContent>
@@ -292,71 +432,75 @@ export default function FinanzasPage() {
           </div>
           <Card className="card-metallic">
             <CardContent className="p-0">
-              <Table>
-                <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Método</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {expenses.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Sin gastos registrados</TableCell></TableRow>}
-                  {expenses.map(e => (
-                    <TableRow key={e.id}>
-                      <TableCell className="font-mono-data text-xs">{fmtDate(e.created_at)}</TableCell>
-                      <TableCell><Badge variant={e.expense_type === 'fixed' ? 'default' : 'secondary'}>{e.expense_type === 'fixed' ? 'Fijo' : 'Ocasional'}</Badge></TableCell>
-                      <TableCell><Badge variant="outline">{e.category}</Badge></TableCell>
-                      <TableCell className="text-sm">{e.payment_method}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{e.description}</TableCell>
-                      <TableCell className="text-right font-mono-data text-red-400">{fmt(Number(e.amount))}</TableCell>
-                      <TableCell><Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'expense', id: e.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <MobileTable>
+                <Table>
+                  <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Método</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {expenses.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Sin gastos registrados</TableCell></TableRow>}
+                    {expenses.map(e => (
+                      <TableRow key={e.id}>
+                        <TableCell className="font-mono-data text-xs">{fmtDate(e.created_at)}</TableCell>
+                        <TableCell><Badge variant={e.expense_type === 'fixed' ? 'default' : 'secondary'}>{e.expense_type === 'fixed' ? 'Fijo' : 'Ocasional'}</Badge></TableCell>
+                        <TableCell><Badge variant="outline">{e.category}</Badge></TableCell>
+                        <TableCell className="text-sm">{e.payment_method}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{e.description}</TableCell>
+                        <TableCell className="text-right font-mono-data text-red-400">{fmt(Number(e.amount))}</TableCell>
+                        <TableCell><Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'expense', id: e.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </MobileTable>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* CREDIT CARD */}
         <TabsContent value="cc" className="space-y-4 mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
             <Card className="card-metallic">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Consumos</CardTitle></CardHeader>
-              <CardContent><p className="text-xl font-bold font-mono-data text-red-400">{fmt(ccPurchases)}</p></CardContent>
+              <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground">Consumos</CardTitle></CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0"><p className="text-base sm:text-xl font-bold font-mono-data text-red-400">{fmt(ccPurchases)}</p></CardContent>
             </Card>
             <Card className="card-metallic">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pagos</CardTitle></CardHeader>
-              <CardContent><p className="text-xl font-bold font-mono-data text-green-400">{fmt(ccPayments)}</p></CardContent>
+              <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground">Pagos</CardTitle></CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0"><p className="text-base sm:text-xl font-bold font-mono-data text-green-400">{fmt(ccPayments)}</p></CardContent>
             </Card>
             <Card className="card-metallic">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pendiente</CardTitle></CardHeader>
-              <CardContent>
-                <p className={`text-xl font-bold font-mono-data ${ccBalance > 0 ? 'text-warning' : 'text-primary'}`}>{fmt(ccBalance)}</p>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><CalIcon className="h-3 w-3" /> Pago: {nextPayDate.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}</p>
+              <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground">Pendiente</CardTitle></CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <p className={`text-base sm:text-xl font-bold font-mono-data ${ccBalance > 0 ? 'text-warning' : 'text-primary'}`}>{fmt(ccBalance)}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 flex items-center gap-1"><CalIcon className="h-3 w-3" /> {nextPayDate.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}</p>
               </CardContent>
             </Card>
           </div>
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-foreground">Movimientos Tarjeta</h2>
+          <div className="flex justify-between items-center gap-2">
+            <h2 className="text-base sm:text-lg font-semibold text-foreground">Movimientos TC</h2>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => { setFormCcType('payment'); openDialog('cc'); }}>Registrar Pago</Button>
-              <Button size="sm" onClick={() => { setFormCcType('purchase'); openDialog('cc'); }}><Plus className="h-4 w-4 mr-1" /> Compra</Button>
+              <Button size="sm" variant="outline" className="text-xs sm:text-sm" onClick={() => { setFormCcType('payment'); openDialog('cc'); }}>Pago</Button>
+              <Button size="sm" className="text-xs sm:text-sm" onClick={() => { setFormCcType('purchase'); openDialog('cc'); }}><Plus className="h-4 w-4 mr-1" /> Compra</Button>
             </div>
           </div>
           <Card className="card-metallic">
             <CardContent className="p-0">
-              <Table>
-                <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {ccTx.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin movimientos</TableCell></TableRow>}
-                  {ccTx.map(t => (
-                    <TableRow key={t.id}>
-                      <TableCell className="font-mono-data text-xs">{fmtDate(t.created_at)}</TableCell>
-                      <TableCell><Badge variant={t.transaction_type === 'purchase' ? 'destructive' : 'default'}>{t.transaction_type === 'purchase' ? 'Compra' : 'Pago'}</Badge></TableCell>
-                      <TableCell className="text-sm">{t.category}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{t.description}</TableCell>
-                      <TableCell className={`text-right font-mono-data ${t.transaction_type === 'purchase' ? 'text-red-400' : 'text-green-400'}`}>{fmt(Number(t.amount))}</TableCell>
-                      <TableCell><Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'cc', id: t.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <MobileTable>
+                <Table>
+                  <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {ccTx.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin movimientos</TableCell></TableRow>}
+                    {ccTx.map(t => (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-mono-data text-xs">{fmtDate(t.created_at)}</TableCell>
+                        <TableCell><Badge variant={t.transaction_type === 'purchase' ? 'destructive' : 'default'}>{t.transaction_type === 'purchase' ? 'Compra' : 'Pago'}</Badge></TableCell>
+                        <TableCell className="text-sm">{t.category}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{t.description}</TableCell>
+                        <TableCell className={`text-right font-mono-data ${t.transaction_type === 'purchase' ? 'text-red-400' : 'text-green-400'}`}>{fmt(Number(t.amount))}</TableCell>
+                        <TableCell><Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'cc', id: t.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </MobileTable>
             </CardContent>
           </Card>
         </TabsContent>
@@ -376,7 +520,7 @@ export default function FinanzasPage() {
               const pct = d.total_amount > 0 ? Math.round(((d.total_amount - d.remaining_amount) / d.total_amount) * 100) : 0;
               return (
                 <Card key={d.id} className="card-metallic">
-                  <CardContent className="p-4 space-y-3">
+                  <CardContent className="p-3 sm:p-4 space-y-3">
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="font-semibold text-foreground">{d.name}</p>
@@ -389,7 +533,7 @@ export default function FinanzasPage() {
                         <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'debt', id: d.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm flex-wrap">
                       <span className="text-muted-foreground">Total: <span className="font-mono-data text-foreground">{fmt(d.total_amount)}</span></span>
                       <span className="text-muted-foreground">Pendiente: <span className="font-mono-data text-warning">{fmt(d.remaining_amount)}</span></span>
                     </div>
@@ -413,9 +557,9 @@ export default function FinanzasPage() {
         {/* HISTORY */}
         <TabsContent value="history" className="space-y-4 mt-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-lg font-semibold text-foreground">Historial de Movimientos</h2>
+            <h2 className="text-lg font-semibold text-foreground">Historial</h2>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-32 sm:w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="income">Ingresos</SelectItem>
@@ -428,22 +572,24 @@ export default function FinanzasPage() {
           </div>
           <Card className="card-metallic">
             <CardContent className="p-0">
-              <Table>
-                <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Método</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {filteredHistory.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin movimientos</TableCell></TableRow>}
-                  {filteredHistory.map(m => (
-                    <TableRow key={m.id}>
-                      <TableCell className="font-mono-data text-xs">{fmtDate(m.created_at)}</TableCell>
-                      <TableCell><Badge variant={m.type === 'income' ? 'default' : m.type === 'expense' ? 'destructive' : 'secondary'}>{MOVEMENT_TYPE_LABELS[m.type]}</Badge></TableCell>
-                      <TableCell className="text-sm">{m.category}</TableCell>
-                      <TableCell className="text-sm">{m.method}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{m.description}</TableCell>
-                      <TableCell className={`text-right font-mono-data ${m.type === 'income' || m.type === 'cc_payment' ? 'text-green-400' : 'text-red-400'}`}>{fmt(m.amount)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <MobileTable>
+                <Table>
+                  <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Método</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {filteredHistory.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin movimientos</TableCell></TableRow>}
+                    {filteredHistory.map(m => (
+                      <TableRow key={m.id}>
+                        <TableCell className="font-mono-data text-xs">{fmtDate(m.created_at)}</TableCell>
+                        <TableCell><Badge variant={m.type === 'income' ? 'default' : m.type === 'expense' ? 'destructive' : 'secondary'}>{MOVEMENT_TYPE_LABELS[m.type]}</Badge></TableCell>
+                        <TableCell className="text-sm">{m.category}</TableCell>
+                        <TableCell className="text-sm">{m.method}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{m.description}</TableCell>
+                        <TableCell className={`text-right font-mono-data ${m.type === 'income' || m.type === 'cc_payment' ? 'text-green-400' : 'text-red-400'}`}>{fmt(m.amount)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </MobileTable>
             </CardContent>
           </Card>
         </TabsContent>
@@ -453,7 +599,7 @@ export default function FinanzasPage() {
 
       {/* Income Dialog */}
       <Dialog open={dialog === 'income'} onOpenChange={o => !o && setDialog(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Registrar Ingreso</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formAmount} onChange={e => setFormAmount(e.target.value)} /></div>
@@ -475,7 +621,7 @@ export default function FinanzasPage() {
 
       {/* Expense Dialog */}
       <Dialog open={dialog === 'expense'} onOpenChange={o => !o && setDialog(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Registrar Gasto</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formAmount} onChange={e => setFormAmount(e.target.value)} /></div>
@@ -502,7 +648,7 @@ export default function FinanzasPage() {
 
       {/* Withdrawal Dialog */}
       <Dialog open={dialog === 'withdrawal'} onOpenChange={o => !o && setDialog(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Registrar Retiro</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formAmount} onChange={e => setFormAmount(e.target.value)} /></div>
@@ -519,7 +665,7 @@ export default function FinanzasPage() {
 
       {/* Credit Card Dialog */}
       <Dialog open={dialog === 'cc'} onOpenChange={o => !o && setDialog(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>{formCcType === 'purchase' ? 'Registrar Compra con TC' : 'Registrar Pago de TC'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formAmount} onChange={e => setFormAmount(e.target.value)} /></div>
@@ -538,7 +684,7 @@ export default function FinanzasPage() {
 
       {/* Debt Dialog */}
       <Dialog open={dialog === 'debt'} onOpenChange={o => !o && setDialog(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Registrar Deuda</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Nombre / Concepto *</Label><Input value={formDebtName} onChange={e => setFormDebtName(e.target.value)} placeholder="Ej: Préstamo personal" /></div>
@@ -555,7 +701,7 @@ export default function FinanzasPage() {
 
       {/* Debt Payment Dialog */}
       <Dialog open={dialog === 'debtpayment'} onOpenChange={o => !o && setDialog(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Registrar Abono a Deuda</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Deuda *</Label>
@@ -570,9 +716,28 @@ export default function FinanzasPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Upcoming Payment Dialog */}
+      <Dialog open={dialog === 'upcoming'} onOpenChange={o => !o && setDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Programar Pago</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Nombre *</Label><Input value={formUpName} onChange={e => setFormUpName(e.target.value)} placeholder="Ej: Internet, Arriendo" /></div>
+            <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formUpAmount} onChange={e => setFormUpAmount(e.target.value)} /></div>
+            <div><Label>Fecha de pago *</Label><Input type="date" value={formUpDate} onChange={e => setFormUpDate(e.target.value)} /></div>
+            <div><Label>Categoría</Label>
+              <Select value={formUpCategory} onValueChange={setFormUpCategory}><SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{UPCOMING_PAYMENT_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div><Label>Notas</Label><Input value={formUpNotes} onChange={e => setFormUpNotes(e.target.value)} placeholder="Opcional" /></div>
+            <Button className="w-full" onClick={handleSaveUpcomingPayment}>Guardar Pago</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Debt Payments List Dialog */}
       <Dialog open={!!debtPaymentsDialog} onOpenChange={o => !o && setDebtPaymentsDialog(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Historial de Abonos</DialogTitle></DialogHeader>
           {debtPaymentsList.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">Sin abonos registrados</p>

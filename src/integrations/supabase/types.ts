@@ -286,6 +286,39 @@ export type Database = {
         }
         Relationships: []
       }
+      upcoming_payments: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          due_date: string
+          id: string
+          is_paid: boolean
+          name: string
+          notes: string | null
+        }
+        Insert: {
+          amount: number
+          category?: string
+          created_at?: string
+          due_date: string
+          id?: string
+          is_paid?: boolean
+          name: string
+          notes?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          is_paid?: boolean
+          name?: string
+          notes?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
