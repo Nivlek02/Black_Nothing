@@ -49,6 +49,17 @@ export interface Debt {
   created_at: string;
 }
 
+export interface UpcomingPayment {
+  id: string;
+  name: string;
+  amount: number;
+  due_date: string;
+  category: string;
+  is_paid: boolean;
+  notes: string;
+  created_at: string;
+}
+
 export interface DebtPayment {
   id: string;
   debt_id: string;
@@ -212,3 +223,24 @@ export const MOVEMENT_TYPE_LABELS: Record<string, string> = {
   cc_payment: 'Pago TC',
   debt_payment: 'Abono deuda',
 };
+
+// Upcoming Payments CRUD
+export async function getUpcomingPayments() {
+  const { data } = await supabase.from('upcoming_payments').select('*').order('due_date', { ascending: true });
+  return (data ?? []) as UpcomingPayment[];
+}
+export async function addUpcomingPayment(p: Omit<UpcomingPayment, 'id' | 'created_at'>) {
+  const { data, error } = await supabase.from('upcoming_payments').insert(p).select().single();
+  if (error) throw error;
+  return data as UpcomingPayment;
+}
+export async function updateUpcomingPayment(id: string, updates: Partial<UpcomingPayment>) {
+  const { error } = await supabase.from('upcoming_payments').update(updates).eq('id', id);
+  if (error) throw error;
+}
+export async function deleteUpcomingPayment(id: string) {
+  const { error } = await supabase.from('upcoming_payments').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export const UPCOMING_PAYMENT_CATEGORIES = ['Servicios', 'Arriendo', 'Suscripción', 'Crédito', 'Seguro', 'Educación', 'Otro'];
