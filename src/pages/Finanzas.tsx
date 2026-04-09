@@ -15,11 +15,11 @@ import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, TrendingUp, TrendingDown, CreditCard, Landmark, PiggyBank, Plus,
   Trash2, ArrowUpCircle, ArrowDownCircle, Banknote, Receipt, HandCoins, History,
-  Calendar as CalIcon, CheckCircle2, Clock
+  Calendar as CalIcon, CheckCircle2, Clock, Wallet, Target, ArrowDown, ArrowUp
 } from 'lucide-react';
 import {
-  Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement, UpcomingPayment,
-  INCOME_CATEGORIES, EXPENSE_CATEGORIES, PAYMENT_METHODS, ATM_SOURCES, MOVEMENT_TYPE_LABELS, UPCOMING_PAYMENT_CATEGORIES,
+  Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement, UpcomingPayment, Savings, SavingsMovement,
+  INCOME_CATEGORIES, EXPENSE_CATEGORIES, PAYMENT_METHODS, ATM_SOURCES, MOVEMENT_TYPE_LABELS, UPCOMING_PAYMENT_CATEGORIES, PAYMENT_FREQUENCIES,
   getIncomes, addIncome, deleteIncome,
   getExpenses, addExpense, deleteExpense,
   getWithdrawals, addWithdrawal, deleteWithdrawal,
@@ -28,6 +28,9 @@ import {
   getDebtPayments, addDebtPayment,
   getMovementHistory,
   getUpcomingPayments, addUpcomingPayment, updateUpcomingPayment, deleteUpcomingPayment,
+  generateRecurringInstances, getNextQuincena,
+  getSavings, addSavings, updateSavings, deleteSavings,
+  getSavingsMovements, addSavingsMovement,
 } from '@/data/finance';
 
 function fmt(n: number) {
@@ -48,7 +51,6 @@ function daysUntil(dateStr: string) {
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-/** Wrapper to make tables horizontally scrollable on mobile */
 function MobileTable({ children }: { children: React.ReactNode }) {
   return (
     <ScrollArea className="w-full whitespace-nowrap">
@@ -70,6 +72,7 @@ export default function FinanzasPage() {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [history, setHistory] = useState<FinanceMovement[]>([]);
   const [upcomingPayments, setUpcomingPayments] = useState<UpcomingPayment[]>([]);
+  const [savings, setSavings] = useState<Savings[]>([]);
 
   // Dialogs
   const [dialog, setDialog] = useState<string | null>(null);
@@ -78,6 +81,10 @@ export default function FinanzasPage() {
   // Debt payments dialog
   const [debtPaymentsDialog, setDebtPaymentsDialog] = useState<string | null>(null);
   const [debtPaymentsList, setDebtPaymentsList] = useState<DebtPayment[]>([]);
+
+  // Savings movements dialog
+  const [savingsMovDialog, setSavingsMovDialog] = useState<string | null>(null);
+  const [savingsMovList, setSavingsMovList] = useState<SavingsMovement[]>([]);
 
   // Form states
   const [formAmount, setFormAmount] = useState('');
@@ -103,16 +110,27 @@ export default function FinanzasPage() {
   const [formUpDate, setFormUpDate] = useState('');
   const [formUpCategory, setFormUpCategory] = useState('Otro');
   const [formUpNotes, setFormUpNotes] = useState('');
+  const [formUpFrequency, setFormUpFrequency] = useState('once');
+  const [formUpEndDate, setFormUpEndDate] = useState('');
+  // Savings form
+  const [formSavName, setFormSavName] = useState('');
+  const [formSavTarget, setFormSavTarget] = useState('');
+  const [formSavNotes, setFormSavNotes] = useState('');
+  // Savings movement form
+  const [formSavMovId, setFormSavMovId] = useState('');
+  const [formSavMovAmount, setFormSavMovAmount] = useState('');
+  const [formSavMovType, setFormSavMovType] = useState('deposit');
+  const [formSavMovNotes, setFormSavMovNotes] = useState('');
 
   // History filters
   const [filterType, setFilterType] = useState('all');
 
   const loadAll = useCallback(async () => {
     try {
-      const [i, e, w, c, d, h, up] = await Promise.all([
-        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(),
+      const [i, e, w, c, d, h, up, sv] = await Promise.all([
+        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(),
       ]);
-      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up);
+      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv);
     } catch (err) {
       console.error('Error loading finance data:', err);
       toast({ title: 'Error al cargar datos financieros', variant: 'destructive' });
@@ -124,6 +142,7 @@ export default function FinanzasPage() {
   const totalIncome = useMemo(() => incomes.reduce((s, r) => s + Number(r.amount), 0), [incomes]);
   const totalExpense = useMemo(() => expenses.reduce((s, r) => s + Number(r.amount), 0), [expenses]);
   const totalWithdrawals = useMemo(() => withdrawals.reduce((s, r) => s + Number(r.amount), 0), [withdrawals]);
+  const totalSavings = useMemo(() => savings.reduce((s, r) => s + Number(r.current_amount), 0), [savings]);
 
   // Credit card
   const ccPurchases = useMemo(() => ccTx.filter(t => t.transaction_type === 'purchase').reduce((s, t) => s + Number(t.amount), 0), [ccTx]);
@@ -133,7 +152,18 @@ export default function FinanzasPage() {
   const ccCutDay = 15;
   const nextPayDate = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > ccCutDay ? 1 : 0), ccCutDay);
 
-  const pendingPayments = useMemo(() => upcomingPayments.filter(p => !p.is_paid), [upcomingPayments]);
+  // Generate all recurring instances for display
+  const allPaymentInstances = useMemo(() => generateRecurringInstances(upcomingPayments), [upcomingPayments]);
+  const pendingPayments = useMemo(() => allPaymentInstances.filter(p => !p.is_paid), [allPaymentInstances]);
+
+  // Quincena summary: payments pending until next 15 or 30/end-of-month
+  const nextQuincena = useMemo(() => getNextQuincena(), []);
+  const quincenaDateStr = `${nextQuincena.getFullYear()}-${String(nextQuincena.getMonth() + 1).padStart(2, '0')}-${String(nextQuincena.getDate()).padStart(2, '0')}`;
+  const quincenaPayments = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return pendingPayments.filter(p => p.due_date >= todayStr && p.due_date <= quincenaDateStr);
+  }, [pendingPayments, quincenaDateStr]);
+  const quincenaTotal = useMemo(() => quincenaPayments.reduce((s, p) => s + Number(p.amount), 0), [quincenaPayments]);
 
   const resetForm = () => {
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
@@ -142,6 +172,9 @@ export default function FinanzasPage() {
     setFormDebtDue(''); setFormDebtNotes('');
     setFormDebtPayAmount(''); setFormDebtPayNotes(''); setFormDebtPayId('');
     setFormUpName(''); setFormUpAmount(''); setFormUpDate(''); setFormUpCategory('Otro'); setFormUpNotes('');
+    setFormUpFrequency('once'); setFormUpEndDate('');
+    setFormSavName(''); setFormSavTarget(''); setFormSavNotes('');
+    setFormSavMovId(''); setFormSavMovAmount(''); setFormSavMovType('deposit'); setFormSavMovNotes('');
   };
   const openDialog = (type: string) => { resetForm(); setDialog(type); };
 
@@ -197,7 +230,12 @@ export default function FinanzasPage() {
   const handleSaveUpcomingPayment = async () => {
     if (!formUpName || !formUpAmount || !formUpDate || Number(formUpAmount) <= 0) return;
     try {
-      await addUpcomingPayment({ name: formUpName, amount: Number(formUpAmount), due_date: formUpDate, category: formUpCategory, is_paid: false, notes: formUpNotes });
+      await addUpcomingPayment({
+        name: formUpName, amount: Number(formUpAmount), due_date: formUpDate,
+        category: formUpCategory, is_paid: false, notes: formUpNotes,
+        frequency: formUpFrequency as 'once' | 'biweekly' | 'monthly',
+        recurrence_end: formUpFrequency !== 'once' && formUpEndDate ? formUpEndDate : null,
+      });
       toast({ title: 'Pago programado registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar pago', variant: 'destructive' }); }
@@ -208,6 +246,22 @@ export default function FinanzasPage() {
       toast({ title: p.is_paid ? 'Marcado como pendiente' : 'Marcado como pagado' });
       loadAll();
     } catch { toast({ title: 'Error al actualizar', variant: 'destructive' }); }
+  };
+  const handleSaveSavings = async () => {
+    if (!formSavName) return;
+    try {
+      await addSavings({ name: formSavName, target_amount: Number(formSavTarget) || 0, current_amount: 0, notes: formSavNotes });
+      toast({ title: 'Ahorro creado' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al crear ahorro', variant: 'destructive' }); }
+  };
+  const handleSaveSavingsMovement = async () => {
+    if (!formSavMovId || !formSavMovAmount || Number(formSavMovAmount) <= 0) return;
+    try {
+      await addSavingsMovement({ savings_id: formSavMovId, amount: Number(formSavMovAmount), movement_type: formSavMovType as 'deposit' | 'withdrawal', notes: formSavMovNotes });
+      toast({ title: formSavMovType === 'deposit' ? 'Depósito registrado' : 'Retiro registrado' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al registrar movimiento', variant: 'destructive' }); }
   };
 
   const handleDelete = async () => {
@@ -220,6 +274,7 @@ export default function FinanzasPage() {
       else if (type === 'cc') await deleteCCTransaction(id);
       else if (type === 'debt') await deleteDebt(id);
       else if (type === 'upcoming') await deleteUpcomingPayment(id);
+      else if (type === 'savings') await deleteSavings(id);
       toast({ title: 'Eliminado correctamente' });
       setDeleteTarget(null); loadAll();
     } catch { toast({ title: 'Error al eliminar', variant: 'destructive' }); }
@@ -229,6 +284,11 @@ export default function FinanzasPage() {
     setDebtPaymentsDialog(debtId);
     const payments = await getDebtPayments(debtId);
     setDebtPaymentsList(payments);
+  };
+  const openSavingsMovements = async (savingsId: string) => {
+    setSavingsMovDialog(savingsId);
+    const movs = await getSavingsMovements(savingsId);
+    setSavingsMovList(movs);
   };
 
   const filteredHistory = useMemo(() => {
@@ -247,6 +307,8 @@ export default function FinanzasPage() {
     { label: 'Abono', icon: HandCoins, color: 'text-emerald-400', action: () => openDialog('debtpayment') },
   ];
 
+  const freqLabel = (f: string) => PAYMENT_FREQUENCIES.find(pf => pf.value === f)?.label || f;
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
@@ -254,7 +316,7 @@ export default function FinanzasPage() {
         <p className="text-xs sm:text-sm text-muted-foreground">Gestión de ingresos, gastos, tarjeta de crédito y deudas</p>
       </div>
 
-      {/* Quick Actions — scrollable on mobile */}
+      {/* Quick Actions */}
       <ScrollArea className="w-full">
         <div className="flex gap-2 pb-2">
           {quickActions.map(qa => (
@@ -269,9 +331,10 @@ export default function FinanzasPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <ScrollArea className="w-full">
-          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-7 sm:w-full">
+          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-8 sm:w-full">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Resumen</TabsTrigger>
             <TabsTrigger value="upcoming" className="text-xs sm:text-sm">Pagos</TabsTrigger>
+            <TabsTrigger value="savings" className="text-xs sm:text-sm">Ahorros</TabsTrigger>
             <TabsTrigger value="incomes" className="text-xs sm:text-sm">Ingresos</TabsTrigger>
             <TabsTrigger value="expenses" className="text-xs sm:text-sm">Gastos</TabsTrigger>
             <TabsTrigger value="cc" className="text-xs sm:text-sm">Tarjeta</TabsTrigger>
@@ -293,14 +356,15 @@ export default function FinanzasPage() {
               <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0"><p className="text-lg sm:text-2xl font-bold font-mono-data text-red-400">{fmt(totalExpense)}</p></CardContent>
             </Card>
             <Card className="card-metallic">
-              <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-2"><Banknote className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-400" /> Retiros</CardTitle></CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0"><p className="text-lg sm:text-2xl font-bold font-mono-data text-yellow-400">{fmt(totalWithdrawals)}</p></CardContent>
+              <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-2"><Wallet className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-400" /> Ahorros</CardTitle></CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0"><p className="text-lg sm:text-2xl font-bold font-mono-data text-emerald-400">{fmt(totalSavings)}</p></CardContent>
             </Card>
             <Card className="card-metallic">
               <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-2"><CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-accent" /> Saldo TC</CardTitle></CardHeader>
               <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0"><p className="text-lg sm:text-2xl font-bold font-mono-data text-accent">{fmt(ccBalance)}</p></CardContent>
             </Card>
           </div>
+
           <Card className="card-metallic">
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><DollarSign className="h-4 w-4 text-primary" /> Balance Neto</CardTitle></CardHeader>
             <CardContent>
@@ -311,16 +375,49 @@ export default function FinanzasPage() {
             </CardContent>
           </Card>
 
-          {/* Upcoming payments preview in overview */}
-          {pendingPayments.length > 0 && (
+          {/* Quincena Summary */}
+          <Card className="card-metallic border-warning/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                <CalIcon className="h-4 w-4 text-warning" /> Pagos hasta el {nextQuincena.getDate()} de {nextQuincena.toLocaleDateString('es-CO', { month: 'long' })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {quincenaPayments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin pagos pendientes en esta quincena 🎉</p>
+              ) : (
+                <>
+                  {quincenaPayments.map(p => (
+                    <div key={p.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Badge variant={daysUntil(p.due_date) <= 3 ? 'destructive' : daysUntil(p.due_date) <= 7 ? 'secondary' : 'outline'} className="text-[10px] shrink-0">
+                          {daysUntil(p.due_date) <= 0 ? 'Hoy' : daysUntil(p.due_date) === 1 ? 'Mañana' : `${daysUntil(p.due_date)}d`}
+                        </Badge>
+                        <span className="text-sm truncate">{p.name}</span>
+                        <span className="text-[10px] text-muted-foreground">{fmtShortDate(p.due_date)}</span>
+                      </div>
+                      <span className="font-mono-data text-sm text-warning shrink-0 ml-2">{fmt(p.amount)}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center pt-2 border-t border-border">
+                    <span className="text-sm font-semibold text-foreground">Total quincena</span>
+                    <span className="font-mono-data text-lg font-bold text-warning">{fmt(quincenaTotal)}</span>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Upcoming payments preview */}
+          {pendingPayments.length > 0 && pendingPayments.length !== quincenaPayments.length && (
             <Card className="card-metallic">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-warning" /> Próximos Pagos
+                  <Clock className="h-4 w-4 text-muted-foreground" /> Todos los pagos pendientes ({pendingPayments.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {pendingPayments.slice(0, 4).map(p => {
+                {pendingPayments.slice(0, 5).map(p => {
                   const days = daysUntil(p.due_date);
                   return (
                     <div key={p.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
@@ -334,7 +431,7 @@ export default function FinanzasPage() {
                     </div>
                   );
                 })}
-                {pendingPayments.length > 4 && (
+                {pendingPayments.length > 5 && (
                   <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setTab('upcoming')}>
                     Ver todos ({pendingPayments.length})
                   </Button>
@@ -364,10 +461,14 @@ export default function FinanzasPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className={`font-semibold text-foreground ${p.is_paid ? 'line-through' : ''}`}>{p.name}</p>
                           <Badge variant="outline" className="text-[10px]">{p.category}</Badge>
+                          {p.frequency !== 'once' && (
+                            <Badge className="text-[10px] bg-purple-600/20 text-purple-400 border-purple-500/30">{freqLabel(p.frequency)}</Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                           <CalIcon className="h-3 w-3" />
                           <span>{fmtShortDate(p.due_date)}</span>
+                          {p.recurrence_end && <span className="text-[10px]">→ {fmtShortDate(p.recurrence_end)}</span>}
                           {!p.is_paid && (
                             <Badge variant={days <= 0 ? 'destructive' : days <= 3 ? 'destructive' : days <= 7 ? 'secondary' : 'outline'} className="text-[10px]">
                               {days < 0 ? `Vencido hace ${Math.abs(days)}d` : days === 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días`}
@@ -387,6 +488,71 @@ export default function FinanzasPage() {
                         </Button>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        {/* SAVINGS */}
+        <TabsContent value="savings" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-foreground">Ahorros</h2>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => openDialog('savingsmovement')}><ArrowDown className="h-4 w-4 mr-1" /> Mover</Button>
+              <Button size="sm" onClick={() => openDialog('savings')}><Plus className="h-4 w-4 mr-1" /> Nuevo</Button>
+            </div>
+          </div>
+
+          {/* Total savings card */}
+          <Card className="card-metallic">
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><Wallet className="h-4 w-4 text-emerald-400" /> Total Ahorrado</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-2xl sm:text-3xl font-bold font-mono-data text-emerald-400">{fmt(totalSavings)}</p>
+            </CardContent>
+          </Card>
+
+          {savings.length === 0 && (
+            <Card className="card-metallic"><CardContent className="py-8 text-center text-muted-foreground">Sin ahorros registrados</CardContent></Card>
+          )}
+          <div className="grid gap-4">
+            {savings.map(s => {
+              const pct = s.target_amount > 0 ? Math.min(100, Math.round((Number(s.current_amount) / Number(s.target_amount)) * 100)) : 0;
+              return (
+                <Card key={s.id} className="card-metallic">
+                  <CardContent className="p-3 sm:p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-semibold text-foreground">{s.name}</p>
+                        {s.notes && <p className="text-xs text-muted-foreground">{s.notes}</p>}
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'savings', id: s.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </div>
+                    <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm flex-wrap">
+                      <span className="text-muted-foreground">Actual: <span className="font-mono-data text-emerald-400">{fmt(Number(s.current_amount))}</span></span>
+                      {Number(s.target_amount) > 0 && (
+                        <span className="text-muted-foreground">Meta: <span className="font-mono-data text-foreground">{fmt(Number(s.target_amount))}</span></span>
+                      )}
+                    </div>
+                    {Number(s.target_amount) > 0 && (
+                      <>
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">{pct}% alcanzado</span>
+                          <Button variant="ghost" size="sm" className="text-xs" onClick={() => openSavingsMovements(s.id)}>
+                            <History className="h-3 w-3 mr-1" /> Ver movimientos
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                    {Number(s.target_amount) === 0 && (
+                      <Button variant="ghost" size="sm" className="text-xs" onClick={() => openSavingsMovements(s.id)}>
+                        <History className="h-3 w-3 mr-1" /> Ver movimientos
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -729,8 +895,56 @@ export default function FinanzasPage() {
                 <SelectContent>{UPCOMING_PAYMENT_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            <div><Label>Frecuencia</Label>
+              <Select value={formUpFrequency} onValueChange={setFormUpFrequency}><SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{PAYMENT_FREQUENCIES.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {formUpFrequency !== 'once' && (
+              <div><Label>Repetir hasta (opcional)</Label><Input type="date" value={formUpEndDate} onChange={e => setFormUpEndDate(e.target.value)} /></div>
+            )}
             <div><Label>Notas</Label><Input value={formUpNotes} onChange={e => setFormUpNotes(e.target.value)} placeholder="Opcional" /></div>
             <Button className="w-full" onClick={handleSaveUpcomingPayment}>Guardar Pago</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Savings Dialog */}
+      <Dialog open={dialog === 'savings'} onOpenChange={o => !o && setDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Nuevo Ahorro</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Nombre *</Label><Input value={formSavName} onChange={e => setFormSavName(e.target.value)} placeholder="Ej: Viaje, Emergencia" /></div>
+            <div><Label>Meta (opcional)</Label><Input type="number" placeholder="0" value={formSavTarget} onChange={e => setFormSavTarget(e.target.value)} /></div>
+            <div><Label>Notas</Label><Input value={formSavNotes} onChange={e => setFormSavNotes(e.target.value)} placeholder="Opcional" /></div>
+            <Button className="w-full" onClick={handleSaveSavings}>Crear Ahorro</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Savings Movement Dialog */}
+      <Dialog open={dialog === 'savingsmovement'} onOpenChange={o => !o && setDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Mover Fondos de Ahorro</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Ahorro *</Label>
+              <Select value={formSavMovId} onValueChange={setFormSavMovId}><SelectTrigger><SelectValue placeholder="Seleccionar ahorro" /></SelectTrigger>
+                <SelectContent>{savings.map(s => <SelectItem key={s.id} value={s.id}>{s.name} — {fmt(Number(s.current_amount))}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div><Label>Tipo</Label>
+              <Select value={formSavMovType} onValueChange={setFormSavMovType}><SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="deposit">Depósito</SelectItem>
+                  <SelectItem value="withdrawal">Retiro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formSavMovAmount} onChange={e => setFormSavMovAmount(e.target.value)} /></div>
+            <div><Label>Notas</Label><Input value={formSavMovNotes} onChange={e => setFormSavMovNotes(e.target.value)} placeholder="Opcional" /></div>
+            <Button className="w-full" onClick={handleSaveSavingsMovement}>
+              {formSavMovType === 'deposit' ? 'Depositar' : 'Retirar'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -750,6 +964,33 @@ export default function FinanzasPage() {
                     <p className="text-xs text-muted-foreground">{fmtDate(p.created_at)}</p>
                   </div>
                   {p.notes && <p className="text-xs text-muted-foreground">{p.notes}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Savings Movements List Dialog */}
+      <Dialog open={!!savingsMovDialog} onOpenChange={o => !o && setSavingsMovDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Movimientos de Ahorro</DialogTitle></DialogHeader>
+          {savingsMovList.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">Sin movimientos registrados</p>
+          ) : (
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {savingsMovList.map(m => (
+                <div key={m.id} className="flex justify-between items-center p-2 rounded bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    {m.movement_type === 'deposit' ? <ArrowDown className="h-3 w-3 text-emerald-400" /> : <ArrowUp className="h-3 w-3 text-red-400" />}
+                    <div>
+                      <p className={`text-sm font-mono-data ${m.movement_type === 'deposit' ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {m.movement_type === 'deposit' ? '+' : '-'}{fmt(m.amount)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{fmtDate(m.created_at)}</p>
+                    </div>
+                  </div>
+                  {m.notes && <p className="text-xs text-muted-foreground">{m.notes}</p>}
                 </div>
               ))}
             </div>

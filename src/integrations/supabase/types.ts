@@ -262,6 +262,68 @@ export type Database = {
         }
         Relationships: []
       }
+      savings: {
+        Row: {
+          created_at: string
+          current_amount: number
+          id: string
+          name: string
+          notes: string | null
+          target_amount: number
+        }
+        Insert: {
+          created_at?: string
+          current_amount?: number
+          id?: string
+          name: string
+          notes?: string | null
+          target_amount?: number
+        }
+        Update: {
+          created_at?: string
+          current_amount?: number
+          id?: string
+          name?: string
+          notes?: string | null
+          target_amount?: number
+        }
+        Relationships: []
+      }
+      savings_movements: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          movement_type: string
+          notes: string | null
+          savings_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          movement_type?: string
+          notes?: string | null
+          savings_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          movement_type?: string
+          notes?: string | null
+          savings_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "savings_movements_savings_id_fkey"
+            columns: ["savings_id"]
+            isOneToOne: false
+            referencedRelation: "savings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       special_dates: {
         Row: {
           color: string
@@ -292,30 +354,36 @@ export type Database = {
           category: string
           created_at: string
           due_date: string
+          frequency: string
           id: string
           is_paid: boolean
           name: string
           notes: string | null
+          recurrence_end: string | null
         }
         Insert: {
           amount: number
           category?: string
           created_at?: string
           due_date: string
+          frequency?: string
           id?: string
           is_paid?: boolean
           name: string
           notes?: string | null
+          recurrence_end?: string | null
         }
         Update: {
           amount?: number
           category?: string
           created_at?: string
           due_date?: string
+          frequency?: string
           id?: string
           is_paid?: boolean
           name?: string
           notes?: string | null
+          recurrence_end?: string | null
         }
         Relationships: []
       }
