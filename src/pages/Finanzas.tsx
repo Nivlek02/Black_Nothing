@@ -36,6 +36,16 @@ import {
 function fmt(n: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
 }
+
+// Format number with dots as thousands separator (no decimals)
+function fmtInput(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  return Number(digits).toLocaleString('es-CO');
+}
+function parseInput(value: string): string {
+  return value.replace(/\D/g, '');
+}
 function fmtDate(d: string) {
   return new Date(d).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
