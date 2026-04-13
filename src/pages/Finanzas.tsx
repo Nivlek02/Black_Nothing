@@ -36,6 +36,16 @@ import {
 function fmt(n: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
 }
+
+// Format number with dots as thousands separator (no decimals)
+function fmtInput(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  return Number(digits).toLocaleString('es-CO');
+}
+function parseInput(value: string): string {
+  return value.replace(/\D/g, '');
+}
 function fmtDate(d: string) {
   return new Date(d).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
@@ -768,7 +778,7 @@ export default function FinanzasPage() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Registrar Ingreso</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formAmount} onChange={e => setFormAmount(e.target.value)} /></div>
+            <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAmount)} onChange={e => setFormAmount(parseInput(e.target.value))} /></div>
             <div><Label>Categoría</Label>
               <Select value={formCategory} onValueChange={setFormCategory}><SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                 <SelectContent>{INCOME_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
@@ -790,7 +800,7 @@ export default function FinanzasPage() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Registrar Gasto</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formAmount} onChange={e => setFormAmount(e.target.value)} /></div>
+            <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAmount)} onChange={e => setFormAmount(parseInput(e.target.value))} /></div>
             <div><Label>Tipo</Label>
               <Select value={formExpenseType} onValueChange={setFormExpenseType}><SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="fixed">Fijo</SelectItem><SelectItem value="occasional">Ocasional</SelectItem></SelectContent>
@@ -817,7 +827,7 @@ export default function FinanzasPage() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Registrar Retiro</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formAmount} onChange={e => setFormAmount(e.target.value)} /></div>
+            <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAmount)} onChange={e => setFormAmount(parseInput(e.target.value))} /></div>
             <div><Label>Cuenta / Fuente</Label>
               <Select value={formSource} onValueChange={setFormSource}><SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{ATM_SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -834,7 +844,7 @@ export default function FinanzasPage() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>{formCcType === 'purchase' ? 'Registrar Compra con TC' : 'Registrar Pago de TC'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formAmount} onChange={e => setFormAmount(e.target.value)} /></div>
+            <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAmount)} onChange={e => setFormAmount(parseInput(e.target.value))} /></div>
             {formCcType === 'purchase' && (
               <div><Label>Categoría</Label>
                 <Select value={formCategory} onValueChange={setFormCategory}><SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
@@ -854,7 +864,7 @@ export default function FinanzasPage() {
           <DialogHeader><DialogTitle>Registrar Deuda</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Nombre / Concepto *</Label><Input value={formDebtName} onChange={e => setFormDebtName(e.target.value)} placeholder="Ej: Préstamo personal" /></div>
-            <div><Label>Monto total *</Label><Input type="number" placeholder="0" value={formDebtTotal} onChange={e => setFormDebtTotal(e.target.value)} /></div>
+            <div><Label>Monto total *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formDebtTotal)} onChange={e => setFormDebtTotal(parseInput(e.target.value))} /></div>
             <div className="grid grid-cols-2 gap-2">
               <div><Label>Fecha inicio</Label><Input type="date" value={formDebtStart} onChange={e => setFormDebtStart(e.target.value)} /></div>
               <div><Label>Fecha límite</Label><Input type="date" value={formDebtDue} onChange={e => setFormDebtDue(e.target.value)} /></div>
@@ -875,7 +885,7 @@ export default function FinanzasPage() {
                 <SelectContent>{debts.filter(d => d.status === 'active').map(d => <SelectItem key={d.id} value={d.id}>{d.name} — {fmt(d.remaining_amount)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div><Label>Monto del abono *</Label><Input type="number" placeholder="0" value={formDebtPayAmount} onChange={e => setFormDebtPayAmount(e.target.value)} /></div>
+            <div><Label>Monto del abono *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formDebtPayAmount)} onChange={e => setFormDebtPayAmount(parseInput(e.target.value))} /></div>
             <div><Label>Notas</Label><Input value={formDebtPayNotes} onChange={e => setFormDebtPayNotes(e.target.value)} placeholder="Opcional" /></div>
             <Button className="w-full" onClick={handleSaveDebtPayment}>Guardar Abono</Button>
           </div>
@@ -888,7 +898,7 @@ export default function FinanzasPage() {
           <DialogHeader><DialogTitle>Programar Pago</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Nombre *</Label><Input value={formUpName} onChange={e => setFormUpName(e.target.value)} placeholder="Ej: Internet, Arriendo" /></div>
-            <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formUpAmount} onChange={e => setFormUpAmount(e.target.value)} /></div>
+            <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formUpAmount)} onChange={e => setFormUpAmount(parseInput(e.target.value))} /></div>
             <div><Label>Fecha de pago *</Label><Input type="date" value={formUpDate} onChange={e => setFormUpDate(e.target.value)} /></div>
             <div><Label>Categoría</Label>
               <Select value={formUpCategory} onValueChange={setFormUpCategory}><SelectTrigger><SelectValue /></SelectTrigger>
@@ -915,7 +925,7 @@ export default function FinanzasPage() {
           <DialogHeader><DialogTitle>Nuevo Ahorro</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Nombre *</Label><Input value={formSavName} onChange={e => setFormSavName(e.target.value)} placeholder="Ej: Viaje, Emergencia" /></div>
-            <div><Label>Meta (opcional)</Label><Input type="number" placeholder="0" value={formSavTarget} onChange={e => setFormSavTarget(e.target.value)} /></div>
+            <div><Label>Meta (opcional)</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formSavTarget)} onChange={e => setFormSavTarget(parseInput(e.target.value))} /></div>
             <div><Label>Notas</Label><Input value={formSavNotes} onChange={e => setFormSavNotes(e.target.value)} placeholder="Opcional" /></div>
             <Button className="w-full" onClick={handleSaveSavings}>Crear Ahorro</Button>
           </div>
@@ -940,7 +950,7 @@ export default function FinanzasPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Monto *</Label><Input type="number" placeholder="0" value={formSavMovAmount} onChange={e => setFormSavMovAmount(e.target.value)} /></div>
+            <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formSavMovAmount)} onChange={e => setFormSavMovAmount(parseInput(e.target.value))} /></div>
             <div><Label>Notas</Label><Input value={formSavMovNotes} onChange={e => setFormSavMovNotes(e.target.value)} placeholder="Opcional" /></div>
             <Button className="w-full" onClick={handleSaveSavingsMovement}>
               {formSavMovType === 'deposit' ? 'Depositar' : 'Retirar'}
