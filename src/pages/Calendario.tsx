@@ -191,7 +191,8 @@ export default function CalendarioPage() {
       const celebration = celebrationMap.get(mmdd);
       const specials = specialMap.get(dateStr) || [];
       const isToday = dateStr === todayStr;
-      const isWeekend = (firstDay + day - 1) % 7 >= 5;
+      const dayOfWeek = (firstDay + day - 1) % 7;
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
       const titleParts: string[] = [];
       if (holiday) titleParts.push(`🚫 ${holiday}`);
