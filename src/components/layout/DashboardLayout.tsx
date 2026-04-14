@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Anchor, LayoutDashboard, CalendarDays, Calendar, Wallet, Menu, X } from 'lucide-react';
+import { Anchor, CalendarDays, Calendar, Wallet, Menu, X } from 'lucide-react';
 
 const navItems = [
-  { label: 'Inicio', path: '/', icon: LayoutDashboard },
   { label: 'Agenda', path: '/agenda', icon: CalendarDays },
   { label: 'Calendario', path: '/calendario', icon: Calendar },
   { label: 'Finanzas', path: '/finanzas', icon: Wallet },

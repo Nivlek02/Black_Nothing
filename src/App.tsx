@@ -7,11 +7,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import { initializeIfNeeded } from "./data/store";
-import HomePage from "./pages/Index";
 import AgendaPage from "./pages/Agenda";
 import CalendarioPage from "./pages/Calendario";
 import FinanzasPage from "./pages/Finanzas";
 import NotFound from "./pages/NotFound";
+import { Navigate } from "react-router-dom";
 
 const queryClient = new QueryClient();
 
@@ -29,7 +29,7 @@ const App = () => {
         <BrowserRouter>
           <DashboardLayout>
             <Routes>
-              <Route path="/" element={<HomePage />} />
+              <Route path="/" element={<Navigate to="/agenda" replace />} />
               <Route path="/agenda" element={<AgendaPage />} />
               <Route path="/calendario" element={<CalendarioPage />} />
               <Route path="/finanzas" element={<FinanzasPage />} />

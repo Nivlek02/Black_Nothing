@@ -77,15 +77,14 @@ const dotColorMap: Record<string, string> = {
 };
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-const DAY_NAMES = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
+const DAY_NAMES = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
 
 function getFirstDayOfMonth(year: number, month: number) {
-  const d = new Date(year, month, 1).getDay();
-  return d === 0 ? 6 : d - 1;
+  return new Date(year, month, 1).getDay(); // 0=Sunday
 }
 
 export default function CalendarioPage() {
@@ -192,7 +191,8 @@ export default function CalendarioPage() {
       const celebration = celebrationMap.get(mmdd);
       const specials = specialMap.get(dateStr) || [];
       const isToday = dateStr === todayStr;
-      const isWeekend = (firstDay + day - 1) % 7 >= 5;
+      const dayOfWeek = (firstDay + day - 1) % 7;
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
       const titleParts: string[] = [];
       if (holiday) titleParts.push(`🚫 ${holiday}`);
