@@ -357,7 +357,7 @@ export default function FinanzasPage() {
 
         {/* OVERVIEW */}
         <TabsContent value="overview" className="space-y-4 mt-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             <Card className="card-metallic">
               <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-2"><TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" /> Ingresos</CardTitle></CardHeader>
               <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0"><p className="text-lg sm:text-2xl font-bold font-mono-data text-green-400">{fmt(totalIncome)}</p></CardContent>
