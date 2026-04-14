@@ -188,6 +188,10 @@ export async function getDebtPayments(debtId: string) {
   const { data } = await supabase.from('debt_payments').select('*').eq('debt_id', debtId).order('created_at', { ascending: false });
   return (data ?? []) as DebtPayment[];
 }
+export async function getAllDebtPaymentsTotal(): Promise<number> {
+  const { data } = await supabase.from('debt_payments').select('amount');
+  return (data ?? []).reduce((s, r) => s + Number(r.amount), 0);
+}
 export async function addDebtPayment(p: Omit<DebtPayment, 'id' | 'created_at'>) {
   const { data, error } = await supabase.from('debt_payments').insert(p).select().single();
   if (error) throw error;
@@ -221,8 +225,15 @@ export async function getTotalIncomes(): Promise<number> {
   return (data ?? []).reduce((s, r) => s + Number(r.amount), 0);
 }
 export async function getTotalExpenses(): Promise<number> {
-  const { data } = await supabase.from('expenses').select('amount');
-  return (data ?? []).reduce((s, r) => s + Number(r.amount), 0);
+  const [expenses, ccPayments, debtPayments] = await Promise.all([
+    supabase.from('expenses').select('amount'),
+    supabase.from('credit_card_transactions').select('amount').eq('transaction_type', 'payment'),
+    supabase.from('debt_payments').select('amount'),
+  ]);
+  const sumExp = (expenses.data ?? []).reduce((s, r) => s + Number(r.amount), 0);
+  const sumCC = (ccPayments.data ?? []).reduce((s, r) => s + Number(r.amount), 0);
+  const sumDebt = (debtPayments.data ?? []).reduce((s, r) => s + Number(r.amount), 0);
+  return sumExp + sumCC + sumDebt;
 }
 
 // Build unified history

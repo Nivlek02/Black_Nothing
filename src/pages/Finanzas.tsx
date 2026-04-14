@@ -25,7 +25,7 @@ import {
   getWithdrawals, addWithdrawal, deleteWithdrawal,
   getCCTransactions, addCCTransaction, deleteCCTransaction,
   getDebts, addDebt, updateDebt, deleteDebt,
-  getDebtPayments, addDebtPayment,
+  getDebtPayments, addDebtPayment, getAllDebtPaymentsTotal,
   getMovementHistory,
   getUpcomingPayments, addUpcomingPayment, updateUpcomingPayment, deleteUpcomingPayment,
   generateRecurringInstances, getNextQuincena,
@@ -83,6 +83,7 @@ export default function FinanzasPage() {
   const [history, setHistory] = useState<FinanceMovement[]>([]);
   const [upcomingPayments, setUpcomingPayments] = useState<UpcomingPayment[]>([]);
   const [savings, setSavings] = useState<Savings[]>([]);
+  const [totalDebtPayments, setTotalDebtPayments] = useState(0);
 
   // Dialogs
   const [dialog, setDialog] = useState<string | null>(null);
@@ -137,10 +138,10 @@ export default function FinanzasPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [i, e, w, c, d, h, up, sv] = await Promise.all([
-        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(),
+      const [i, e, w, c, d, h, up, sv, dpTotal] = await Promise.all([
+        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(), getAllDebtPaymentsTotal(),
       ]);
-      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv);
+      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv); setTotalDebtPayments(dpTotal);
     } catch (err) {
       console.error('Error loading finance data:', err);
       toast({ title: 'Error al cargar datos financieros', variant: 'destructive' });
@@ -150,7 +151,7 @@ export default function FinanzasPage() {
   useEffect(() => { loadAll(); }, [loadAll]);
 
   const totalIncome = useMemo(() => incomes.reduce((s, r) => s + Number(r.amount), 0), [incomes]);
-  const totalExpense = useMemo(() => expenses.reduce((s, r) => s + Number(r.amount), 0), [expenses]);
+  const totalExpenseBase = useMemo(() => expenses.reduce((s, r) => s + Number(r.amount), 0), [expenses]);
   const totalWithdrawals = useMemo(() => withdrawals.reduce((s, r) => s + Number(r.amount), 0), [withdrawals]);
   const totalSavings = useMemo(() => savings.reduce((s, r) => s + Number(r.current_amount), 0), [savings]);
   const totalDebts = useMemo(() => debts.filter(d => d.status === 'active').reduce((s, d) => s + Number(d.remaining_amount), 0), [debts]);
@@ -159,6 +160,8 @@ export default function FinanzasPage() {
   const ccPurchases = useMemo(() => ccTx.filter(t => t.transaction_type === 'purchase').reduce((s, t) => s + Number(t.amount), 0), [ccTx]);
   const ccPayments = useMemo(() => ccTx.filter(t => t.transaction_type === 'payment').reduce((s, t) => s + Number(t.amount), 0), [ccTx]);
   const ccBalance = ccPurchases - ccPayments;
+  // Total gastos incluye gastos directos + pagos TC + abonos deudas
+  const totalExpense = totalExpenseBase + ccPayments + totalDebtPayments;
   const now = new Date();
   const ccCutDay = 15;
   const nextPayDate = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > ccCutDay ? 1 : 0), ccCutDay);
@@ -386,7 +389,7 @@ export default function FinanzasPage() {
               <p className={`text-2xl sm:text-3xl font-bold font-mono-data ${totalIncome - totalExpense - totalWithdrawals >= 0 ? 'text-primary' : 'text-destructive'}`}>
                 {fmt(totalIncome - totalExpense - totalWithdrawals)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Ingresos − Gastos − Retiros</p>
+              <p className="text-xs text-muted-foreground mt-1">Ingresos − Gastos − Retiros (incluye abonos y pagos TC)</p>
             </CardContent>
           </Card>
 
