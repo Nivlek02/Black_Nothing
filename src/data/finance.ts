@@ -188,6 +188,10 @@ export async function getDebtPayments(debtId: string) {
   const { data } = await supabase.from('debt_payments').select('*').eq('debt_id', debtId).order('created_at', { ascending: false });
   return (data ?? []) as DebtPayment[];
 }
+export async function getAllDebtPaymentsTotal(): Promise<number> {
+  const { data } = await supabase.from('debt_payments').select('amount');
+  return (data ?? []).reduce((s, r) => s + Number(r.amount), 0);
+}
 export async function addDebtPayment(p: Omit<DebtPayment, 'id' | 'created_at'>) {
   const { data, error } = await supabase.from('debt_payments').insert(p).select().single();
   if (error) throw error;
