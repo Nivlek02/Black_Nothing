@@ -151,7 +151,7 @@ export default function FinanzasPage() {
   useEffect(() => { loadAll(); }, [loadAll]);
 
   const totalIncome = useMemo(() => incomes.reduce((s, r) => s + Number(r.amount), 0), [incomes]);
-  const totalExpense = useMemo(() => expenses.reduce((s, r) => s + Number(r.amount), 0), [expenses]);
+  const totalExpenseBase = useMemo(() => expenses.reduce((s, r) => s + Number(r.amount), 0), [expenses]);
   const totalWithdrawals = useMemo(() => withdrawals.reduce((s, r) => s + Number(r.amount), 0), [withdrawals]);
   const totalSavings = useMemo(() => savings.reduce((s, r) => s + Number(r.current_amount), 0), [savings]);
   const totalDebts = useMemo(() => debts.filter(d => d.status === 'active').reduce((s, d) => s + Number(d.remaining_amount), 0), [debts]);
