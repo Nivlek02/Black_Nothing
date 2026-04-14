@@ -887,7 +887,7 @@ export default function FinanzasPage() {
           <div className="space-y-3">
             <div><Label>Deuda *</Label>
               <Select value={formDebtPayId} onValueChange={setFormDebtPayId}><SelectTrigger><SelectValue placeholder="Seleccionar deuda" /></SelectTrigger>
-                <SelectContent>{debts.filter(d => d.status === 'active').map(d => <SelectItem key={d.id} value={d.id}>{d.name} — {fmt(d.remaining_amount)}</SelectItem>)}</SelectContent>
+                <SelectContent>{debts.filter(d => d.status !== 'paid').map(d => <SelectItem key={d.id} value={d.id}>{d.name} — {fmt(d.remaining_amount)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Monto del abono *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formDebtPayAmount)} onChange={e => setFormDebtPayAmount(parseInput(e.target.value))} /></div>
