@@ -162,8 +162,8 @@ export default function FinanzasPage() {
   const ccPurchases = useMemo(() => ccTx.filter(t => t.transaction_type === 'purchase').reduce((s, t) => s + Number(t.amount), 0), [ccTx]);
   const ccPayments = useMemo(() => ccTx.filter(t => t.transaction_type === 'payment').reduce((s, t) => s + Number(t.amount), 0), [ccTx]);
   const ccBalance = ccPurchases - ccPayments;
-  // Total gastos incluye gastos directos + pagos TC + abonos deudas
-  const totalExpense = totalExpenseBase + ccPayments + totalDebtPayments;
+  // Total gastos incluye gastos directos + pagos TC + abonos deudas + pagos pendientes pagados + depósitos ahorro
+  const totalExpense = totalExpenseBase + ccPayments + totalDebtPayments + totalPaidPayments + totalSavingsDeposits;
   const now = new Date();
   const ccCutDay = 15;
   const nextPayDate = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > ccCutDay ? 1 : 0), ccCutDay);
