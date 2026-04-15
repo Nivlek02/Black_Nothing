@@ -25,7 +25,7 @@ import {
   getWithdrawals, addWithdrawal, deleteWithdrawal,
   getCCTransactions, addCCTransaction, deleteCCTransaction,
   getDebts, addDebt, updateDebt, deleteDebt,
-  getDebtPayments, addDebtPayment, getAllDebtPaymentsTotal,
+  getDebtPayments, addDebtPayment, getAllDebtPaymentsTotal, getTotalPaidUpcomingPayments, getTotalSavingsDeposits,
   getMovementHistory,
   getUpcomingPayments, addUpcomingPayment, updateUpcomingPayment, deleteUpcomingPayment,
   generateRecurringInstances, getNextQuincena,
@@ -84,6 +84,8 @@ export default function FinanzasPage() {
   const [upcomingPayments, setUpcomingPayments] = useState<UpcomingPayment[]>([]);
   const [savings, setSavings] = useState<Savings[]>([]);
   const [totalDebtPayments, setTotalDebtPayments] = useState(0);
+  const [totalPaidPayments, setTotalPaidPayments] = useState(0);
+  const [totalSavingsDeposits, setTotalSavingsDeposits] = useState(0);
 
   // Dialogs
   const [dialog, setDialog] = useState<string | null>(null);
@@ -138,10 +140,10 @@ export default function FinanzasPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [i, e, w, c, d, h, up, sv, dpTotal] = await Promise.all([
-        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(), getAllDebtPaymentsTotal(),
+      const [i, e, w, c, d, h, up, sv, dpTotal, paidPay, savDep] = await Promise.all([
+        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(), getAllDebtPaymentsTotal(), getTotalPaidUpcomingPayments(), getTotalSavingsDeposits(),
       ]);
-      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv); setTotalDebtPayments(dpTotal);
+      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv); setTotalDebtPayments(dpTotal); setTotalPaidPayments(paidPay); setTotalSavingsDeposits(savDep);
     } catch (err) {
       console.error('Error loading finance data:', err);
       toast({ title: 'Error al cargar datos financieros', variant: 'destructive' });
@@ -160,8 +162,8 @@ export default function FinanzasPage() {
   const ccPurchases = useMemo(() => ccTx.filter(t => t.transaction_type === 'purchase').reduce((s, t) => s + Number(t.amount), 0), [ccTx]);
   const ccPayments = useMemo(() => ccTx.filter(t => t.transaction_type === 'payment').reduce((s, t) => s + Number(t.amount), 0), [ccTx]);
   const ccBalance = ccPurchases - ccPayments;
-  // Total gastos incluye gastos directos + pagos TC + abonos deudas
-  const totalExpense = totalExpenseBase + ccPayments + totalDebtPayments;
+  // Total gastos incluye gastos directos + pagos TC + abonos deudas + pagos pendientes pagados + depósitos ahorro
+  const totalExpense = totalExpenseBase + ccPayments + totalDebtPayments + totalPaidPayments + totalSavingsDeposits;
   const now = new Date();
   const ccCutDay = 15;
   const nextPayDate = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > ccCutDay ? 1 : 0), ccCutDay);
@@ -178,6 +180,43 @@ export default function FinanzasPage() {
     return pendingPayments.filter(p => p.due_date >= todayStr && p.due_date <= quincenaDateStr);
   }, [pendingPayments, quincenaDateStr]);
   const quincenaTotal = useMemo(() => quincenaPayments.reduce((s, p) => s + Number(p.amount), 0), [quincenaPayments]);
+
+  // Monthly summary grouped by month
+  const monthlySummary = useMemo(() => {
+    const months: Record<string, { income: number; expense: number; scheduled: number; paid: number }> = {};
+    const getKey = (dateStr: string) => {
+      const d = new Date(dateStr + 'T12:00:00');
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+    const getKeyTs = (dateStr: string) => {
+      const d = new Date(dateStr);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+    const ensure = (key: string) => {
+      if (!months[key]) months[key] = { income: 0, expense: 0, scheduled: 0, paid: 0 };
+    };
+    incomes.forEach(i => { const k = getKeyTs(i.created_at); ensure(k); months[k].income += Number(i.amount); });
+    expenses.forEach(e => { const k = getKeyTs(e.created_at); ensure(k); months[k].expense += Number(e.amount); });
+    ccTx.filter(t => t.transaction_type === 'payment').forEach(t => { const k = getKeyTs(t.created_at); ensure(k); months[k].expense += Number(t.amount); });
+    allPaymentInstances.forEach(p => {
+      const k = getKey(p.due_date);
+      ensure(k);
+      if (p.is_paid) {
+        months[k].paid += Number(p.amount);
+        months[k].expense += Number(p.amount);
+      } else {
+        months[k].scheduled += Number(p.amount);
+      }
+    });
+    return Object.entries(months)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, data]) => ({
+        key,
+        label: new Date(key + '-15').toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }),
+        ...data,
+      }));
+  }, [incomes, expenses, ccTx, allPaymentInstances]);
+
 
   const resetForm = () => {
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
@@ -389,7 +428,7 @@ export default function FinanzasPage() {
               <p className={`text-2xl sm:text-3xl font-bold font-mono-data ${totalIncome - totalExpense - totalWithdrawals >= 0 ? 'text-primary' : 'text-destructive'}`}>
                 {fmt(totalIncome - totalExpense - totalWithdrawals)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Ingresos − Gastos − Retiros (incluye abonos y pagos TC)</p>
+              <p className="text-xs text-muted-foreground mt-1">Ingresos − Gastos − Retiros (incluye abonos, pagos TC, pagos pendientes y depósitos ahorro)</p>
             </CardContent>
           </Card>
 
@@ -454,6 +493,45 @@ export default function FinanzasPage() {
                     Ver todos ({pendingPayments.length})
                   </Button>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Monthly Summary */}
+          {monthlySummary.length > 0 && (
+            <Card className="card-metallic">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <CalIcon className="h-4 w-4 text-primary" /> Resumen Mensual
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MobileTable>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Mes</TableHead>
+                        <TableHead className="text-xs text-right">Ingresos</TableHead>
+                        <TableHead className="text-xs text-right">Gastos</TableHead>
+                        <TableHead className="text-xs text-right">Programados</TableHead>
+                        <TableHead className="text-xs text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {monthlySummary.map(m => (
+                        <TableRow key={m.key}>
+                          <TableCell className="text-xs capitalize">{m.label}</TableCell>
+                          <TableCell className="text-xs text-right font-mono-data text-green-400">{fmt(m.income)}</TableCell>
+                          <TableCell className="text-xs text-right font-mono-data text-red-400">{fmt(m.expense)}</TableCell>
+                          <TableCell className="text-xs text-right font-mono-data text-warning">{fmt(m.scheduled)}</TableCell>
+                          <TableCell className={`text-xs text-right font-mono-data ${m.income - m.expense - m.scheduled >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                            {fmt(m.income - m.expense - m.scheduled)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </MobileTable>
               </CardContent>
             </Card>
           )}
