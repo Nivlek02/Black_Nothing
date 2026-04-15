@@ -259,7 +259,7 @@ export default function FinanzasPage() {
     } catch { toast({ title: 'Error al registrar retiro', variant: 'destructive' }); }
   };
   const handleSaveCCTx = async () => {
-    if (!formAmount || Number(formAmount) <= 0) return;
+    if (formCcType === 'purchase' && (!formAmount || Number(formAmount) <= 0)) return;
     try {
       const payAmount = formCcType === 'payment' && formCcPayMode === 'total'
         ? ccBalance
