@@ -995,9 +995,6 @@ export default function FinanzasPage() {
           </div>
         </DialogContent>
       </Dialog>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Debt Dialog */}
       <Dialog open={dialog === 'debt'} onOpenChange={o => !o && setDialog(null)}>
