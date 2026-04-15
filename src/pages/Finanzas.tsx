@@ -25,7 +25,7 @@ import {
   getWithdrawals, addWithdrawal, deleteWithdrawal,
   getCCTransactions, addCCTransaction, deleteCCTransaction,
   getDebts, addDebt, updateDebt, deleteDebt,
-  getDebtPayments, addDebtPayment, getAllDebtPaymentsTotal,
+  getDebtPayments, addDebtPayment, getAllDebtPaymentsTotal, getTotalPaidUpcomingPayments, getTotalSavingsDeposits,
   getMovementHistory,
   getUpcomingPayments, addUpcomingPayment, updateUpcomingPayment, deleteUpcomingPayment,
   generateRecurringInstances, getNextQuincena,
