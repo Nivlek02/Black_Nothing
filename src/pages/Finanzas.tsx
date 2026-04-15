@@ -391,7 +391,7 @@ export default function FinanzasPage() {
               <p className={`text-2xl sm:text-3xl font-bold font-mono-data ${totalIncome - totalExpense - totalWithdrawals >= 0 ? 'text-primary' : 'text-destructive'}`}>
                 {fmt(totalIncome - totalExpense - totalWithdrawals)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Ingresos − Gastos − Retiros (incluye abonos y pagos TC)</p>
+              <p className="text-xs text-muted-foreground mt-1">Ingresos − Gastos − Retiros (incluye abonos, pagos TC, pagos pendientes y depósitos ahorro)</p>
             </CardContent>
           </Card>
 
