@@ -220,6 +220,14 @@ export async function addDebtPayment(p: Omit<DebtPayment, 'id' | 'created_at'>) 
 }
 
 // Aggregate helpers
+export async function getTotalPaidUpcomingPayments(): Promise<number> {
+  const { data } = await supabase.from('upcoming_payments').select('amount').eq('is_paid', true);
+  return (data ?? []).reduce((s, r) => s + Number(r.amount), 0);
+}
+export async function getTotalSavingsDeposits(): Promise<number> {
+  const { data } = await supabase.from('savings_movements').select('amount').eq('movement_type', 'deposit');
+  return (data ?? []).reduce((s, r) => s + Number(r.amount), 0);
+}
 export async function getTotalIncomes(): Promise<number> {
   const { data } = await supabase.from('incomes').select('amount');
   return (data ?? []).reduce((s, r) => s + Number(r.amount), 0);
