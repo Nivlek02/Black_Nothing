@@ -107,6 +107,8 @@ export default function FinanzasPage() {
   const [formExpenseType, setFormExpenseType] = useState('occasional');
   const [formSource, setFormSource] = useState('Cuenta principal');
   const [formCcType, setFormCcType] = useState('purchase');
+  const [formCcPayMode, setFormCcPayMode] = useState<'total' | 'single'>('total');
+  const [formCcPayTarget, setFormCcPayTarget] = useState('');
   // Debt form
   const [formDebtName, setFormDebtName] = useState('');
   const [formDebtTotal, setFormDebtTotal] = useState('');
@@ -220,7 +222,7 @@ export default function FinanzasPage() {
 
   const resetForm = () => {
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
-    setFormExpenseType('occasional'); setFormSource('Cuenta principal'); setFormCcType('purchase');
+    setFormExpenseType('occasional'); setFormSource('Cuenta principal'); setFormCcType('purchase'); setFormCcPayMode('total'); setFormCcPayTarget('');
     setFormDebtName(''); setFormDebtTotal(''); setFormDebtStart(new Date().toISOString().split('T')[0]);
     setFormDebtDue(''); setFormDebtNotes('');
     setFormDebtPayAmount(''); setFormDebtPayNotes(''); setFormDebtPayId('');
@@ -257,9 +259,22 @@ export default function FinanzasPage() {
     } catch { toast({ title: 'Error al registrar retiro', variant: 'destructive' }); }
   };
   const handleSaveCCTx = async () => {
-    if (!formAmount || Number(formAmount) <= 0) return;
+    if (formCcType === 'purchase' && (!formAmount || Number(formAmount) <= 0)) return;
     try {
-      await addCCTransaction({ amount: Number(formAmount), transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: formDescription });
+      const payAmount = formCcType === 'payment' && formCcPayMode === 'total'
+        ? ccBalance
+        : formCcType === 'payment' && formCcPayMode === 'single' && formCcPayTarget
+          ? Number(ccTx.find(t => t.id === formCcPayTarget)?.amount ?? 0)
+          : Number(formAmount);
+      if (formCcType === 'payment' && formCcPayMode !== 'total' && formCcPayMode !== 'single') return;
+      const finalAmount = formCcType === 'payment' && (formCcPayMode === 'total' || formCcPayMode === 'single') ? payAmount : Number(formAmount);
+      if (finalAmount <= 0) return;
+      const desc = formCcType === 'payment' && formCcPayMode === 'single' && formCcPayTarget
+        ? `Pago compra: ${ccTx.find(t => t.id === formCcPayTarget)?.description || ccTx.find(t => t.id === formCcPayTarget)?.category || ''}`
+        : formCcType === 'payment' && formCcPayMode === 'total'
+          ? 'Pago total TC'
+          : formDescription;
+      await addCCTransaction({ amount: finalAmount, transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: desc });
       toast({ title: formCcType === 'purchase' ? 'Compra TC registrada' : 'Pago TC registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar movimiento TC', variant: 'destructive' }); }
@@ -930,16 +945,53 @@ export default function FinanzasPage() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>{formCcType === 'purchase' ? 'Registrar Compra con TC' : 'Registrar Pago de TC'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAmount)} onChange={e => setFormAmount(parseInput(e.target.value))} /></div>
             {formCcType === 'purchase' && (
-              <div><Label>Categoría</Label>
-                <Select value={formCategory} onValueChange={setFormCategory}><SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                  <SelectContent>{EXPENSE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+              <>
+                <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAmount)} onChange={e => setFormAmount(parseInput(e.target.value))} /></div>
+                <div><Label>Categoría</Label>
+                  <Select value={formCategory} onValueChange={setFormCategory}><SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                    <SelectContent>{EXPENSE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div><Label>Descripción</Label><Input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Opcional" /></div>
+              </>
             )}
-            <div><Label>Descripción</Label><Input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Opcional" /></div>
-            <Button className="w-full" onClick={handleSaveCCTx}>{formCcType === 'purchase' ? 'Guardar Compra' : 'Guardar Pago'}</Button>
+            {formCcType === 'payment' && (
+              <>
+                <div><Label>Modo de pago</Label>
+                  <Select value={formCcPayMode} onValueChange={v => { setFormCcPayMode(v as 'total' | 'single'); setFormCcPayTarget(''); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="total">Pagar total ({fmt(ccBalance)})</SelectItem>
+                      <SelectItem value="single">Pagar 1 compra específica</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {formCcPayMode === 'single' && (
+                  <div><Label>Seleccionar compra</Label>
+                    <Select value={formCcPayTarget} onValueChange={setFormCcPayTarget}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar compra" /></SelectTrigger>
+                      <SelectContent>
+                        {ccTx.filter(t => t.transaction_type === 'purchase').map(t => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.description || t.category} — {fmt(Number(t.amount))}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {formCcPayMode === 'single' && formCcPayTarget && (
+                  <p className="text-sm text-muted-foreground">Monto: <span className="font-bold text-foreground">{fmt(Number(ccTx.find(t => t.id === formCcPayTarget)?.amount ?? 0))}</span></p>
+                )}
+                {formCcPayMode === 'total' && (
+                  <p className="text-sm text-muted-foreground">Se pagará el saldo total: <span className="font-bold text-foreground">{fmt(ccBalance)}</span></p>
+                )}
+              </>
+            )}
+            <Button className="w-full" onClick={handleSaveCCTx} disabled={formCcType === 'payment' && formCcPayMode === 'single' && !formCcPayTarget}>
+              {formCcType === 'purchase' ? 'Guardar Compra' : 'Guardar Pago'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
