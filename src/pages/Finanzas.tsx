@@ -496,6 +496,45 @@ export default function FinanzasPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Monthly Summary */}
+          {monthlySummary.length > 0 && (
+            <Card className="card-metallic">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <CalIcon className="h-4 w-4 text-primary" /> Resumen Mensual
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MobileTable>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Mes</TableHead>
+                        <TableHead className="text-xs text-right">Ingresos</TableHead>
+                        <TableHead className="text-xs text-right">Gastos</TableHead>
+                        <TableHead className="text-xs text-right">Programados</TableHead>
+                        <TableHead className="text-xs text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {monthlySummary.map(m => (
+                        <TableRow key={m.key}>
+                          <TableCell className="text-xs capitalize">{m.label}</TableCell>
+                          <TableCell className="text-xs text-right font-mono-data text-green-400">{fmt(m.income)}</TableCell>
+                          <TableCell className="text-xs text-right font-mono-data text-red-400">{fmt(m.expense)}</TableCell>
+                          <TableCell className="text-xs text-right font-mono-data text-warning">{fmt(m.scheduled)}</TableCell>
+                          <TableCell className={`text-xs text-right font-mono-data ${m.income - m.expense - m.scheduled >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                            {fmt(m.income - m.expense - m.scheduled)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </MobileTable>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* UPCOMING PAYMENTS */}
