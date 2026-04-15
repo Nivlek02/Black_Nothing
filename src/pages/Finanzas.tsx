@@ -107,6 +107,8 @@ export default function FinanzasPage() {
   const [formExpenseType, setFormExpenseType] = useState('occasional');
   const [formSource, setFormSource] = useState('Cuenta principal');
   const [formCcType, setFormCcType] = useState('purchase');
+  const [formCcPayMode, setFormCcPayMode] = useState<'total' | 'single'>('total');
+  const [formCcPayTarget, setFormCcPayTarget] = useState('');
   // Debt form
   const [formDebtName, setFormDebtName] = useState('');
   const [formDebtTotal, setFormDebtTotal] = useState('');
