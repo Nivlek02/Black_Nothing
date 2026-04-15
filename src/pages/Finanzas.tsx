@@ -181,7 +181,43 @@ export default function FinanzasPage() {
   }, [pendingPayments, quincenaDateStr]);
   const quincenaTotal = useMemo(() => quincenaPayments.reduce((s, p) => s + Number(p.amount), 0), [quincenaPayments]);
 
-  const resetForm = () => {
+  // Monthly summary grouped by month
+  const monthlySummary = useMemo(() => {
+    const months: Record<string, { income: number; expense: number; scheduled: number; paid: number }> = {};
+    const getKey = (dateStr: string) => {
+      const d = new Date(dateStr + 'T12:00:00');
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+    const getKeyTs = (dateStr: string) => {
+      const d = new Date(dateStr);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+    const ensure = (key: string) => {
+      if (!months[key]) months[key] = { income: 0, expense: 0, scheduled: 0, paid: 0 };
+    };
+    incomes.forEach(i => { const k = getKeyTs(i.created_at); ensure(k); months[k].income += Number(i.amount); });
+    expenses.forEach(e => { const k = getKeyTs(e.created_at); ensure(k); months[k].expense += Number(e.amount); });
+    ccTx.filter(t => t.transaction_type === 'payment').forEach(t => { const k = getKeyTs(t.created_at); ensure(k); months[k].expense += Number(t.amount); });
+    allPaymentInstances.forEach(p => {
+      const k = getKey(p.due_date);
+      ensure(k);
+      if (p.is_paid) {
+        months[k].paid += Number(p.amount);
+        months[k].expense += Number(p.amount);
+      } else {
+        months[k].scheduled += Number(p.amount);
+      }
+    });
+    return Object.entries(months)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, data]) => ({
+        key,
+        label: new Date(key + '-15').toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }),
+        ...data,
+      }));
+  }, [incomes, expenses, ccTx, allPaymentInstances]);
+
+
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
     setFormExpenseType('occasional'); setFormSource('Cuenta principal'); setFormCcType('purchase');
     setFormDebtName(''); setFormDebtTotal(''); setFormDebtStart(new Date().toISOString().split('T')[0]);
