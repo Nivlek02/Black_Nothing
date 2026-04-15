@@ -261,7 +261,20 @@ export default function FinanzasPage() {
   const handleSaveCCTx = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
     try {
-      await addCCTransaction({ amount: Number(formAmount), transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: formDescription });
+      const payAmount = formCcType === 'payment' && formCcPayMode === 'total'
+        ? ccBalance
+        : formCcType === 'payment' && formCcPayMode === 'single' && formCcPayTarget
+          ? Number(ccTx.find(t => t.id === formCcPayTarget)?.amount ?? 0)
+          : Number(formAmount);
+      if (formCcType === 'payment' && formCcPayMode !== 'total' && formCcPayMode !== 'single') return;
+      const finalAmount = formCcType === 'payment' && (formCcPayMode === 'total' || formCcPayMode === 'single') ? payAmount : Number(formAmount);
+      if (finalAmount <= 0) return;
+      const desc = formCcType === 'payment' && formCcPayMode === 'single' && formCcPayTarget
+        ? `Pago compra: ${ccTx.find(t => t.id === formCcPayTarget)?.description || ccTx.find(t => t.id === formCcPayTarget)?.category || ''}`
+        : formCcType === 'payment' && formCcPayMode === 'total'
+          ? 'Pago total TC'
+          : formDescription;
+      await addCCTransaction({ amount: finalAmount, transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: desc });
       toast({ title: formCcType === 'purchase' ? 'Compra TC registrada' : 'Pago TC registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar movimiento TC', variant: 'destructive' }); }
