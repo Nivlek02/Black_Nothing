@@ -84,6 +84,8 @@ export default function FinanzasPage() {
   const [upcomingPayments, setUpcomingPayments] = useState<UpcomingPayment[]>([]);
   const [savings, setSavings] = useState<Savings[]>([]);
   const [totalDebtPayments, setTotalDebtPayments] = useState(0);
+  const [totalPaidPayments, setTotalPaidPayments] = useState(0);
+  const [totalSavingsDeposits, setTotalSavingsDeposits] = useState(0);
 
   // Dialogs
   const [dialog, setDialog] = useState<string | null>(null);
