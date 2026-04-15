@@ -218,6 +218,7 @@ export default function FinanzasPage() {
   }, [incomes, expenses, ccTx, allPaymentInstances]);
 
 
+  const resetForm = () => {
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
     setFormExpenseType('occasional'); setFormSource('Cuenta principal'); setFormCcType('purchase');
     setFormDebtName(''); setFormDebtTotal(''); setFormDebtStart(new Date().toISOString().split('T')[0]);
