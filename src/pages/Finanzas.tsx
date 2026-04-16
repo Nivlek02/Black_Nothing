@@ -754,8 +754,8 @@ export default function FinanzasPage() {
           <div className="flex justify-between items-center gap-2">
             <h2 className="text-base sm:text-lg font-semibold text-foreground">Movimientos TC</h2>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="text-xs sm:text-sm" onClick={() => { setFormCcType('payment'); openDialog('cc'); }}>Pago</Button>
-              <Button size="sm" className="text-xs sm:text-sm" onClick={() => { setFormCcType('purchase'); openDialog('cc'); }}><Plus className="h-4 w-4 mr-1" /> Compra</Button>
+              <Button size="sm" variant="outline" className="text-xs sm:text-sm" onClick={() => openDialog('cc', 'payment')}>Pago</Button>
+              <Button size="sm" className="text-xs sm:text-sm" onClick={() => openDialog('cc', 'purchase')}><Plus className="h-4 w-4 mr-1" /> Compra</Button>
             </div>
           </div>
           <Card className="card-metallic">
