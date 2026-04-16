@@ -231,7 +231,7 @@ export default function FinanzasPage() {
     setFormSavName(''); setFormSavTarget(''); setFormSavNotes('');
     setFormSavMovId(''); setFormSavMovAmount(''); setFormSavMovType('deposit'); setFormSavMovNotes('');
   };
-  const openDialog = (type: string) => { resetForm(); setDialog(type); };
+  const openDialog = (type: string, ccType?: string) => { resetForm(); if (ccType) setFormCcType(ccType); setDialog(type); };
 
   // Handlers
   const handleSaveIncome = async () => {
