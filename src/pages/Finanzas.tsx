@@ -231,7 +231,7 @@ export default function FinanzasPage() {
     setFormSavName(''); setFormSavTarget(''); setFormSavNotes('');
     setFormSavMovId(''); setFormSavMovAmount(''); setFormSavMovType('deposit'); setFormSavMovNotes('');
   };
-  const openDialog = (type: string) => { resetForm(); setDialog(type); };
+  const openDialog = (type: string, ccType?: string) => { resetForm(); if (ccType) setFormCcType(ccType); setDialog(type); };
 
   // Handlers
   const handleSaveIncome = async () => {
@@ -369,8 +369,8 @@ export default function FinanzasPage() {
     { label: 'Ingreso', icon: ArrowUpCircle, color: 'text-green-400', action: () => openDialog('income') },
     { label: 'Gasto', icon: ArrowDownCircle, color: 'text-red-400', action: () => openDialog('expense') },
     { label: 'Retiro', icon: Banknote, color: 'text-yellow-400', action: () => openDialog('withdrawal') },
-    { label: 'TC', icon: CreditCard, color: 'text-accent', action: () => { setFormCcType('purchase'); openDialog('cc'); } },
-    { label: 'Pago TC', icon: Receipt, color: 'text-primary', action: () => { setFormCcType('payment'); openDialog('cc'); } },
+    { label: 'TC', icon: CreditCard, color: 'text-accent', action: () => openDialog('cc', 'purchase') },
+    { label: 'Pago TC', icon: Receipt, color: 'text-primary', action: () => openDialog('cc', 'payment') },
     { label: 'Deuda', icon: PiggyBank, color: 'text-orange-400', action: () => openDialog('debt') },
     { label: 'Abono', icon: HandCoins, color: 'text-emerald-400', action: () => openDialog('debtpayment') },
   ];
@@ -754,8 +754,8 @@ export default function FinanzasPage() {
           <div className="flex justify-between items-center gap-2">
             <h2 className="text-base sm:text-lg font-semibold text-foreground">Movimientos TC</h2>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="text-xs sm:text-sm" onClick={() => { setFormCcType('payment'); openDialog('cc'); }}>Pago</Button>
-              <Button size="sm" className="text-xs sm:text-sm" onClick={() => { setFormCcType('purchase'); openDialog('cc'); }}><Plus className="h-4 w-4 mr-1" /> Compra</Button>
+              <Button size="sm" variant="outline" className="text-xs sm:text-sm" onClick={() => openDialog('cc', 'payment')}>Pago</Button>
+              <Button size="sm" className="text-xs sm:text-sm" onClick={() => openDialog('cc', 'purchase')}><Plus className="h-4 w-4 mr-1" /> Compra</Button>
             </div>
           </div>
           <Card className="card-metallic">
