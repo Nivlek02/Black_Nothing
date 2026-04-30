@@ -638,7 +638,12 @@ export default function FinanzasPage() {
                         <p className="font-semibold text-foreground">{s.name}</p>
                         {s.notes && <p className="text-xs text-muted-foreground">{s.notes}</p>}
                       </div>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'savings', id: s.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="outline" size="sm" className="text-xs" onClick={() => openDialog('savingsmovement', undefined, s.id)}>
+                          <Plus className="h-3 w-3 mr-1" /> Agregar
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'savings', id: s.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm flex-wrap">
                       <span className="text-muted-foreground">Actual: <span className="font-mono-data text-emerald-400">{fmt(Number(s.current_amount))}</span></span>
