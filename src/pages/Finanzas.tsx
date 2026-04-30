@@ -1095,6 +1095,9 @@ export default function FinanzasPage() {
             </div>
             <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formSavMovAmount)} onChange={e => setFormSavMovAmount(parseInput(e.target.value))} /></div>
             <div><Label>Notas</Label><Input value={formSavMovNotes} onChange={e => setFormSavMovNotes(e.target.value)} placeholder="Opcional" /></div>
+            {formSavMovType === 'deposit' && (
+              <p className="text-xs text-muted-foreground">💡 Los depósitos se descuentan de tus ingresos como gasto.</p>
+            )}
             <Button className="w-full" onClick={handleSaveSavingsMovement}>
               {formSavMovType === 'deposit' ? 'Depositar' : 'Retirar'}
             </Button>
