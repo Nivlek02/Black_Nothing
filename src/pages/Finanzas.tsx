@@ -231,7 +231,7 @@ export default function FinanzasPage() {
     setFormSavName(''); setFormSavTarget(''); setFormSavNotes('');
     setFormSavMovId(''); setFormSavMovAmount(''); setFormSavMovType('deposit'); setFormSavMovNotes('');
   };
-  const openDialog = (type: string, ccType?: string) => { resetForm(); if (ccType) setFormCcType(ccType); setDialog(type); };
+  const openDialog = (type: string, ccType?: string, savingsId?: string) => { resetForm(); if (ccType) setFormCcType(ccType); if (savingsId) { setFormSavMovId(savingsId); setFormSavMovType('deposit'); } setDialog(type); };
 
   // Handlers
   const handleSaveIncome = async () => {
@@ -611,7 +611,7 @@ export default function FinanzasPage() {
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-foreground">Ahorros</h2>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => openDialog('savingsmovement')}><ArrowDown className="h-4 w-4 mr-1" /> Mover</Button>
+              <Button size="sm" variant="outline" onClick={() => openDialog('savingsmovement')}><ArrowDown className="h-4 w-4 mr-1" /> Agregar / Retirar</Button>
               <Button size="sm" onClick={() => openDialog('savings')}><Plus className="h-4 w-4 mr-1" /> Nuevo</Button>
             </div>
           </div>
@@ -638,7 +638,12 @@ export default function FinanzasPage() {
                         <p className="font-semibold text-foreground">{s.name}</p>
                         {s.notes && <p className="text-xs text-muted-foreground">{s.notes}</p>}
                       </div>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'savings', id: s.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="outline" size="sm" className="text-xs" onClick={() => openDialog('savingsmovement', undefined, s.id)}>
+                          <Plus className="h-3 w-3 mr-1" /> Agregar
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'savings', id: s.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm flex-wrap">
                       <span className="text-muted-foreground">Actual: <span className="font-mono-data text-emerald-400">{fmt(Number(s.current_amount))}</span></span>
@@ -1090,6 +1095,9 @@ export default function FinanzasPage() {
             </div>
             <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formSavMovAmount)} onChange={e => setFormSavMovAmount(parseInput(e.target.value))} /></div>
             <div><Label>Notas</Label><Input value={formSavMovNotes} onChange={e => setFormSavMovNotes(e.target.value)} placeholder="Opcional" /></div>
+            {formSavMovType === 'deposit' && (
+              <p className="text-xs text-muted-foreground">💡 Los depósitos se descuentan de tus ingresos como gasto.</p>
+            )}
             <Button className="w-full" onClick={handleSaveSavingsMovement}>
               {formSavMovType === 'deposit' ? 'Depositar' : 'Retirar'}
             </Button>
