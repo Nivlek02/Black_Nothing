@@ -611,7 +611,7 @@ export default function FinanzasPage() {
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-foreground">Ahorros</h2>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => openDialog('savingsmovement')}><ArrowDown className="h-4 w-4 mr-1" /> Mover</Button>
+              <Button size="sm" variant="outline" onClick={() => openDialog('savingsmovement')}><ArrowDown className="h-4 w-4 mr-1" /> Agregar / Retirar</Button>
               <Button size="sm" onClick={() => openDialog('savings')}><Plus className="h-4 w-4 mr-1" /> Nuevo</Button>
             </div>
           </div>
