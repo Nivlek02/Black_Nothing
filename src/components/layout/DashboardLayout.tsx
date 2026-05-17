@@ -3,9 +3,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { Anchor, CalendarDays, Calendar, Wallet, Menu, X } from 'lucide-react';
 
 const navItems = [
-  { label: 'Agenda', path: '/agenda', icon: CalendarDays },
   { label: 'Calendario', path: '/calendario', icon: Calendar },
   { label: 'Finanzas', path: '/finanzas', icon: Wallet },
+  { label: 'Agenda', path: '/agenda', icon: CalendarDays },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
