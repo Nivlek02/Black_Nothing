@@ -448,8 +448,9 @@ export default function FinanzasPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <ScrollArea className="w-full">
-          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-8 sm:w-full">
+          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-9 sm:w-full">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Resumen</TabsTrigger>
+            <TabsTrigger value="accounts" className="text-xs sm:text-sm">Cuentas</TabsTrigger>
             <TabsTrigger value="upcoming" className="text-xs sm:text-sm">Pagos</TabsTrigger>
             <TabsTrigger value="savings" className="text-xs sm:text-sm">Ahorros</TabsTrigger>
             <TabsTrigger value="incomes" className="text-xs sm:text-sm">Ingresos</TabsTrigger>
