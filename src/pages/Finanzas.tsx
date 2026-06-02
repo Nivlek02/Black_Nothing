@@ -602,8 +602,43 @@ export default function FinanzasPage() {
           )}
         </TabsContent>
 
+        {/* ACCOUNTS */}
+        <TabsContent value="accounts" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-foreground">Cuentas Bancarias</h2>
+            <Button size="sm" onClick={() => openDialog('account')}><Plus className="h-4 w-4 mr-1" /> Nueva cuenta</Button>
+          </div>
+          {accounts.length === 0 && (
+            <Card className="card-metallic"><CardContent className="py-8 text-center text-muted-foreground">Sin cuentas registradas. Crea tu primera cuenta para comenzar a registrar movimientos.</CardContent></Card>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {accounts.map(a => {
+              const balance = computeAccountBalance(a, incomes, expenses, withdrawals, ccTx);
+              return (
+                <Card key={a.id} className="card-metallic">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-foreground flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" />{a.name}</p>
+                        {a.notes && <p className="text-xs text-muted-foreground mt-1">{a.notes}</p>}
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'account', id: a.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </div>
+                    <div className="pt-2 border-t border-border">
+                      <p className="text-xs text-muted-foreground">Saldo disponible</p>
+                      <p className={`text-2xl font-bold font-mono-data ${balance < 0 ? 'text-destructive' : 'text-primary'}`}>{fmt(balance)}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Inicial: {fmt(Number(a.initial_balance))}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </TabsContent>
+
         {/* UPCOMING PAYMENTS */}
         <TabsContent value="upcoming" className="space-y-4 mt-4">
+
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-foreground">Próximos Pagos</h2>
             <Button size="sm" onClick={() => openDialog('upcoming')}><Plus className="h-4 w-4 mr-1" /> Agregar</Button>
