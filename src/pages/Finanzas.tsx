@@ -981,8 +981,17 @@ export default function FinanzasPage() {
                 <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            <div><Label>Cuenta *</Label>
+              {accounts.length === 0 ? (
+                <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
+              ) : (
+                <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
             <div><Label>Descripción</Label><Input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Opcional" /></div>
-            <Button className="w-full" onClick={handleSaveIncome}>Guardar Ingreso</Button>
+            <Button className="w-full" onClick={handleSaveIncome} disabled={accounts.length === 0}>Guardar Ingreso</Button>
           </div>
         </DialogContent>
       </Dialog>
