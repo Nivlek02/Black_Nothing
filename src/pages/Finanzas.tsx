@@ -230,6 +230,8 @@ export default function FinanzasPage() {
   const resetForm = () => {
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
     setFormExpenseType('occasional'); setFormSource('Cuenta principal'); setFormCcType('purchase'); setFormCcPayMode('total'); setFormCcPayTarget('');
+    setFormAccountId(accounts[0]?.id ?? '');
+    setFormAccName(''); setFormAccBalance(''); setFormAccNotes('');
     setFormDebtName(''); setFormDebtTotal(''); setFormDebtStart(new Date().toISOString().split('T')[0]);
     setFormDebtDue(''); setFormDebtNotes('');
     setFormDebtPayAmount(''); setFormDebtPayNotes(''); setFormDebtPayId('');
@@ -240,27 +242,61 @@ export default function FinanzasPage() {
   };
   const openDialog = (type: string, ccType?: string, savingsId?: string) => { resetForm(); if (ccType) setFormCcType(ccType); if (savingsId) { setFormSavMovId(savingsId); setFormSavMovType('deposit'); } setDialog(type); };
 
+  // Balance computation per account
+  const getAccountBalance = (accountId: string): number => {
+    const acc = accounts.find(a => a.id === accountId);
+    if (!acc) return 0;
+    return computeAccountBalance(acc, incomes, expenses, withdrawals, ccTx);
+  };
+  const checkSufficient = (accountId: string, amount: number): boolean => {
+    if (!accountId) return true; // no account selected -> skip check
+    const balance = getAccountBalance(accountId);
+    if (amount > balance) {
+      const acc = accounts.find(a => a.id === accountId);
+      toast({
+        title: 'Saldo insuficiente',
+        description: `${acc?.name ?? 'Cuenta'}: saldo ${fmt(balance)}, intentas usar ${fmt(amount)}.`,
+        variant: 'destructive',
+      });
+      return false;
+    }
+    return true;
+  };
+
   // Handlers
+  const handleSaveAccount = async () => {
+    if (!formAccName) return;
+    try {
+      await addBankAccount({ name: formAccName, initial_balance: Number(formAccBalance) || 0, notes: formAccNotes });
+      toast({ title: 'Cuenta creada' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al crear cuenta', variant: 'destructive' }); }
+  };
   const handleSaveIncome = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
+    if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
     try {
-      await addIncome({ amount: Number(formAmount), category: formCategory || 'Otro', description: formDescription, payment_method: formMethod });
+      await addIncome({ amount: Number(formAmount), category: formCategory || 'Otro', description: formDescription, payment_method: formMethod, account_id: formAccountId || null });
       toast({ title: 'Ingreso registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar ingreso', variant: 'destructive' }); }
   };
   const handleSaveExpense = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
+    if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
+    if (!checkSufficient(formAccountId, Number(formAmount))) return;
     try {
-      await addExpense({ amount: Number(formAmount), category: formCategory || 'Otro', expense_type: formExpenseType as 'fixed' | 'occasional', description: formDescription, payment_method: formMethod });
+      await addExpense({ amount: Number(formAmount), category: formCategory || 'Otro', expense_type: formExpenseType as 'fixed' | 'occasional', description: formDescription, payment_method: formMethod, account_id: formAccountId || null });
       toast({ title: 'Gasto registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar gasto', variant: 'destructive' }); }
   };
   const handleSaveWithdrawal = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
+    if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
+    if (!checkSufficient(formAccountId, Number(formAmount))) return;
     try {
-      await addWithdrawal({ amount: Number(formAmount), source: formSource, description: formDescription });
+      await addWithdrawal({ amount: Number(formAmount), source: formSource, description: formDescription, account_id: formAccountId || null });
       toast({ title: 'Retiro registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar retiro', variant: 'destructive' }); }
@@ -276,12 +312,17 @@ export default function FinanzasPage() {
       if (formCcType === 'payment' && formCcPayMode !== 'total' && formCcPayMode !== 'single') return;
       const finalAmount = formCcType === 'payment' && (formCcPayMode === 'total' || formCcPayMode === 'single') ? payAmount : Number(formAmount);
       if (finalAmount <= 0) return;
+      // Account is required only for payments (charged to bank account). Purchases don't deduct from a bank account.
+      if (formCcType === 'payment') {
+        if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
+        if (!checkSufficient(formAccountId, finalAmount)) return;
+      }
       const desc = formCcType === 'payment' && formCcPayMode === 'single' && formCcPayTarget
         ? `Pago compra: ${ccTx.find(t => t.id === formCcPayTarget)?.description || ccTx.find(t => t.id === formCcPayTarget)?.category || ''}`
         : formCcType === 'payment' && formCcPayMode === 'total'
           ? 'Pago total TC'
           : formDescription;
-      await addCCTransaction({ amount: finalAmount, transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: desc });
+      await addCCTransaction({ amount: finalAmount, transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: desc, account_id: formCcType === 'payment' ? (formAccountId || null) : null });
       toast({ title: formCcType === 'purchase' ? 'Compra TC registrada' : 'Pago TC registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar movimiento TC', variant: 'destructive' }); }
