@@ -1105,11 +1105,37 @@ export default function FinanzasPage() {
                 {formCcPayMode === 'total' && (
                   <p className="text-sm text-muted-foreground">Se pagará el saldo total: <span className="font-bold text-foreground">{fmt(ccBalance)}</span></p>
                 )}
+                <div><Label>Pagar desde cuenta *</Label>
+                  {accounts.length === 0 ? (
+                    <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
+                  ) : (
+                    <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                      <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                </div>
               </>
             )}
-            <Button className="w-full" onClick={handleSaveCCTx} disabled={formCcType === 'payment' && formCcPayMode === 'single' && !formCcPayTarget}>
+            <Button className="w-full" onClick={handleSaveCCTx} disabled={
+              (formCcType === 'payment' && formCcPayMode === 'single' && !formCcPayTarget) ||
+              (formCcType === 'payment' && accounts.length === 0)
+            }>
               {formCcType === 'purchase' ? 'Guardar Compra' : 'Guardar Pago'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bank Account Dialog */}
+      <Dialog open={dialog === 'account'} onOpenChange={o => !o && setDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Nueva Cuenta Bancaria</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Nombre *</Label><Input value={formAccName} onChange={e => setFormAccName(e.target.value)} placeholder="Ej: Bancolombia, Nequi" /></div>
+            <div><Label>Saldo inicial</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAccBalance)} onChange={e => setFormAccBalance(parseInput(e.target.value))} /></div>
+            <div><Label>Notas</Label><Input value={formAccNotes} onChange={e => setFormAccNotes(e.target.value)} placeholder="Opcional" /></div>
+            <p className="text-xs text-muted-foreground">El saldo se calcula como: inicial + ingresos − gastos − retiros − pagos de TC.</p>
+            <Button className="w-full" onClick={handleSaveAccount}>Crear Cuenta</Button>
           </div>
         </DialogContent>
       </Dialog>
