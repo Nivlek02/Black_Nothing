@@ -111,6 +111,11 @@ export default function FinanzasPage() {
   const [formCcType, setFormCcType] = useState('purchase');
   const [formCcPayMode, setFormCcPayMode] = useState<'total' | 'single'>('total');
   const [formCcPayTarget, setFormCcPayTarget] = useState('');
+  const [formAccountId, setFormAccountId] = useState<string>('');
+  // Bank account form
+  const [formAccName, setFormAccName] = useState('');
+  const [formAccBalance, setFormAccBalance] = useState('');
+  const [formAccNotes, setFormAccNotes] = useState('');
   // Debt form
   const [formDebtName, setFormDebtName] = useState('');
   const [formDebtTotal, setFormDebtTotal] = useState('');
