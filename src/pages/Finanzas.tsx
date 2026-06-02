@@ -18,7 +18,7 @@ import {
   Calendar as CalIcon, CheckCircle2, Clock, Wallet, Target, ArrowDown, ArrowUp
 } from 'lucide-react';
 import {
-  Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement, UpcomingPayment, Savings, SavingsMovement,
+  Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement, UpcomingPayment, Savings, SavingsMovement, BankAccount,
   INCOME_CATEGORIES, EXPENSE_CATEGORIES, PAYMENT_METHODS, ATM_SOURCES, MOVEMENT_TYPE_LABELS, UPCOMING_PAYMENT_CATEGORIES, PAYMENT_FREQUENCIES,
   getIncomes, addIncome, deleteIncome,
   getExpenses, addExpense, deleteExpense,
@@ -31,6 +31,7 @@ import {
   generateRecurringInstances, getNextQuincena,
   getSavings, addSavings, updateSavings, deleteSavings,
   getSavingsMovements, addSavingsMovement,
+  getBankAccounts, addBankAccount, deleteBankAccount, computeAccountBalance,
 } from '@/data/finance';
 
 function fmt(n: number) {
@@ -83,6 +84,7 @@ export default function FinanzasPage() {
   const [history, setHistory] = useState<FinanceMovement[]>([]);
   const [upcomingPayments, setUpcomingPayments] = useState<UpcomingPayment[]>([]);
   const [savings, setSavings] = useState<Savings[]>([]);
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [totalDebtPayments, setTotalDebtPayments] = useState(0);
   const [totalPaidPayments, setTotalPaidPayments] = useState(0);
   const [totalSavingsDeposits, setTotalSavingsDeposits] = useState(0);
@@ -109,6 +111,11 @@ export default function FinanzasPage() {
   const [formCcType, setFormCcType] = useState('purchase');
   const [formCcPayMode, setFormCcPayMode] = useState<'total' | 'single'>('total');
   const [formCcPayTarget, setFormCcPayTarget] = useState('');
+  const [formAccountId, setFormAccountId] = useState<string>('');
+  // Bank account form
+  const [formAccName, setFormAccName] = useState('');
+  const [formAccBalance, setFormAccBalance] = useState('');
+  const [formAccNotes, setFormAccNotes] = useState('');
   // Debt form
   const [formDebtName, setFormDebtName] = useState('');
   const [formDebtTotal, setFormDebtTotal] = useState('');
@@ -142,10 +149,10 @@ export default function FinanzasPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [i, e, w, c, d, h, up, sv, dpTotal, paidPay, savDep] = await Promise.all([
-        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(), getAllDebtPaymentsTotal(), getTotalPaidUpcomingPayments(), getTotalSavingsDeposits(),
+      const [i, e, w, c, d, h, up, sv, ba, dpTotal, paidPay, savDep] = await Promise.all([
+        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(), getBankAccounts(), getAllDebtPaymentsTotal(), getTotalPaidUpcomingPayments(), getTotalSavingsDeposits(),
       ]);
-      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv); setTotalDebtPayments(dpTotal); setTotalPaidPayments(paidPay); setTotalSavingsDeposits(savDep);
+      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv); setAccounts(ba); setTotalDebtPayments(dpTotal); setTotalPaidPayments(paidPay); setTotalSavingsDeposits(savDep);
     } catch (err) {
       console.error('Error loading finance data:', err);
       toast({ title: 'Error al cargar datos financieros', variant: 'destructive' });
@@ -223,6 +230,8 @@ export default function FinanzasPage() {
   const resetForm = () => {
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
     setFormExpenseType('occasional'); setFormSource('Cuenta principal'); setFormCcType('purchase'); setFormCcPayMode('total'); setFormCcPayTarget('');
+    setFormAccountId(accounts[0]?.id ?? '');
+    setFormAccName(''); setFormAccBalance(''); setFormAccNotes('');
     setFormDebtName(''); setFormDebtTotal(''); setFormDebtStart(new Date().toISOString().split('T')[0]);
     setFormDebtDue(''); setFormDebtNotes('');
     setFormDebtPayAmount(''); setFormDebtPayNotes(''); setFormDebtPayId('');
@@ -233,27 +242,61 @@ export default function FinanzasPage() {
   };
   const openDialog = (type: string, ccType?: string, savingsId?: string) => { resetForm(); if (ccType) setFormCcType(ccType); if (savingsId) { setFormSavMovId(savingsId); setFormSavMovType('deposit'); } setDialog(type); };
 
+  // Balance computation per account
+  const getAccountBalance = (accountId: string): number => {
+    const acc = accounts.find(a => a.id === accountId);
+    if (!acc) return 0;
+    return computeAccountBalance(acc, incomes, expenses, withdrawals, ccTx);
+  };
+  const checkSufficient = (accountId: string, amount: number): boolean => {
+    if (!accountId) return true; // no account selected -> skip check
+    const balance = getAccountBalance(accountId);
+    if (amount > balance) {
+      const acc = accounts.find(a => a.id === accountId);
+      toast({
+        title: 'Saldo insuficiente',
+        description: `${acc?.name ?? 'Cuenta'}: saldo ${fmt(balance)}, intentas usar ${fmt(amount)}.`,
+        variant: 'destructive',
+      });
+      return false;
+    }
+    return true;
+  };
+
   // Handlers
+  const handleSaveAccount = async () => {
+    if (!formAccName) return;
+    try {
+      await addBankAccount({ name: formAccName, initial_balance: Number(formAccBalance) || 0, notes: formAccNotes });
+      toast({ title: 'Cuenta creada' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al crear cuenta', variant: 'destructive' }); }
+  };
   const handleSaveIncome = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
+    if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
     try {
-      await addIncome({ amount: Number(formAmount), category: formCategory || 'Otro', description: formDescription, payment_method: formMethod });
+      await addIncome({ amount: Number(formAmount), category: formCategory || 'Otro', description: formDescription, payment_method: formMethod, account_id: formAccountId || null });
       toast({ title: 'Ingreso registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar ingreso', variant: 'destructive' }); }
   };
   const handleSaveExpense = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
+    if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
+    if (!checkSufficient(formAccountId, Number(formAmount))) return;
     try {
-      await addExpense({ amount: Number(formAmount), category: formCategory || 'Otro', expense_type: formExpenseType as 'fixed' | 'occasional', description: formDescription, payment_method: formMethod });
+      await addExpense({ amount: Number(formAmount), category: formCategory || 'Otro', expense_type: formExpenseType as 'fixed' | 'occasional', description: formDescription, payment_method: formMethod, account_id: formAccountId || null });
       toast({ title: 'Gasto registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar gasto', variant: 'destructive' }); }
   };
   const handleSaveWithdrawal = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
+    if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
+    if (!checkSufficient(formAccountId, Number(formAmount))) return;
     try {
-      await addWithdrawal({ amount: Number(formAmount), source: formSource, description: formDescription });
+      await addWithdrawal({ amount: Number(formAmount), source: formSource, description: formDescription, account_id: formAccountId || null });
       toast({ title: 'Retiro registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar retiro', variant: 'destructive' }); }
@@ -269,12 +312,17 @@ export default function FinanzasPage() {
       if (formCcType === 'payment' && formCcPayMode !== 'total' && formCcPayMode !== 'single') return;
       const finalAmount = formCcType === 'payment' && (formCcPayMode === 'total' || formCcPayMode === 'single') ? payAmount : Number(formAmount);
       if (finalAmount <= 0) return;
+      // Account is required only for payments (charged to bank account). Purchases don't deduct from a bank account.
+      if (formCcType === 'payment') {
+        if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
+        if (!checkSufficient(formAccountId, finalAmount)) return;
+      }
       const desc = formCcType === 'payment' && formCcPayMode === 'single' && formCcPayTarget
         ? `Pago compra: ${ccTx.find(t => t.id === formCcPayTarget)?.description || ccTx.find(t => t.id === formCcPayTarget)?.category || ''}`
         : formCcType === 'payment' && formCcPayMode === 'total'
           ? 'Pago total TC'
           : formDescription;
-      await addCCTransaction({ amount: finalAmount, transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: desc });
+      await addCCTransaction({ amount: finalAmount, transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: desc, account_id: formCcType === 'payment' ? (formAccountId || null) : null });
       toast({ title: formCcType === 'purchase' ? 'Compra TC registrada' : 'Pago TC registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar movimiento TC', variant: 'destructive' }); }
@@ -343,6 +391,7 @@ export default function FinanzasPage() {
       else if (type === 'debt') await deleteDebt(id);
       else if (type === 'upcoming') await deleteUpcomingPayment(id);
       else if (type === 'savings') await deleteSavings(id);
+      else if (type === 'account') await deleteBankAccount(id);
       toast({ title: 'Eliminado correctamente' });
       setDeleteTarget(null); loadAll();
     } catch { toast({ title: 'Error al eliminar', variant: 'destructive' }); }
@@ -399,8 +448,9 @@ export default function FinanzasPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <ScrollArea className="w-full">
-          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-8 sm:w-full">
+          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-9 sm:w-full">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Resumen</TabsTrigger>
+            <TabsTrigger value="accounts" className="text-xs sm:text-sm">Cuentas</TabsTrigger>
             <TabsTrigger value="upcoming" className="text-xs sm:text-sm">Pagos</TabsTrigger>
             <TabsTrigger value="savings" className="text-xs sm:text-sm">Ahorros</TabsTrigger>
             <TabsTrigger value="incomes" className="text-xs sm:text-sm">Ingresos</TabsTrigger>
@@ -552,8 +602,43 @@ export default function FinanzasPage() {
           )}
         </TabsContent>
 
+        {/* ACCOUNTS */}
+        <TabsContent value="accounts" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-foreground">Cuentas Bancarias</h2>
+            <Button size="sm" onClick={() => openDialog('account')}><Plus className="h-4 w-4 mr-1" /> Nueva cuenta</Button>
+          </div>
+          {accounts.length === 0 && (
+            <Card className="card-metallic"><CardContent className="py-8 text-center text-muted-foreground">Sin cuentas registradas. Crea tu primera cuenta para comenzar a registrar movimientos.</CardContent></Card>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {accounts.map(a => {
+              const balance = computeAccountBalance(a, incomes, expenses, withdrawals, ccTx);
+              return (
+                <Card key={a.id} className="card-metallic">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-foreground flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" />{a.name}</p>
+                        {a.notes && <p className="text-xs text-muted-foreground mt-1">{a.notes}</p>}
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'account', id: a.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </div>
+                    <div className="pt-2 border-t border-border">
+                      <p className="text-xs text-muted-foreground">Saldo disponible</p>
+                      <p className={`text-2xl font-bold font-mono-data ${balance < 0 ? 'text-destructive' : 'text-primary'}`}>{fmt(balance)}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Inicial: {fmt(Number(a.initial_balance))}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </TabsContent>
+
         {/* UPCOMING PAYMENTS */}
         <TabsContent value="upcoming" className="space-y-4 mt-4">
+
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-foreground">Próximos Pagos</h2>
             <Button size="sm" onClick={() => openDialog('upcoming')}><Plus className="h-4 w-4 mr-1" /> Agregar</Button>
@@ -878,6 +963,7 @@ export default function FinanzasPage() {
       </Tabs>
 
       {/* ===== DIALOGS ===== */}
+      {/* Reusable account selector rendered inline below in each dialog */}
 
       {/* Income Dialog */}
       <Dialog open={dialog === 'income'} onOpenChange={o => !o && setDialog(null)}>
@@ -895,8 +981,17 @@ export default function FinanzasPage() {
                 <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            <div><Label>Cuenta *</Label>
+              {accounts.length === 0 ? (
+                <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
+              ) : (
+                <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
             <div><Label>Descripción</Label><Input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Opcional" /></div>
-            <Button className="w-full" onClick={handleSaveIncome}>Guardar Ingreso</Button>
+            <Button className="w-full" onClick={handleSaveIncome} disabled={accounts.length === 0}>Guardar Ingreso</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -922,8 +1017,17 @@ export default function FinanzasPage() {
                 <SelectContent>{PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            <div><Label>Cuenta *</Label>
+              {accounts.length === 0 ? (
+                <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
+              ) : (
+                <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
             <div><Label>Descripción</Label><Input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Opcional" /></div>
-            <Button className="w-full" onClick={handleSaveExpense}>Guardar Gasto</Button>
+            <Button className="w-full" onClick={handleSaveExpense} disabled={accounts.length === 0}>Guardar Gasto</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -934,13 +1038,22 @@ export default function FinanzasPage() {
           <DialogHeader><DialogTitle>Registrar Retiro</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAmount)} onChange={e => setFormAmount(parseInput(e.target.value))} /></div>
-            <div><Label>Cuenta / Fuente</Label>
+            <div><Label>Cuenta *</Label>
+              {accounts.length === 0 ? (
+                <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
+              ) : (
+                <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
+            <div><Label>Fuente (cajero / canal)</Label>
               <Select value={formSource} onValueChange={setFormSource}><SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{ATM_SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Descripción</Label><Input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Opcional" /></div>
-            <Button className="w-full" onClick={handleSaveWithdrawal}>Guardar Retiro</Button>
+            <Button className="w-full" onClick={handleSaveWithdrawal} disabled={accounts.length === 0}>Guardar Retiro</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -992,11 +1105,37 @@ export default function FinanzasPage() {
                 {formCcPayMode === 'total' && (
                   <p className="text-sm text-muted-foreground">Se pagará el saldo total: <span className="font-bold text-foreground">{fmt(ccBalance)}</span></p>
                 )}
+                <div><Label>Pagar desde cuenta *</Label>
+                  {accounts.length === 0 ? (
+                    <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
+                  ) : (
+                    <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                      <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                </div>
               </>
             )}
-            <Button className="w-full" onClick={handleSaveCCTx} disabled={formCcType === 'payment' && formCcPayMode === 'single' && !formCcPayTarget}>
+            <Button className="w-full" onClick={handleSaveCCTx} disabled={
+              (formCcType === 'payment' && formCcPayMode === 'single' && !formCcPayTarget) ||
+              (formCcType === 'payment' && accounts.length === 0)
+            }>
               {formCcType === 'purchase' ? 'Guardar Compra' : 'Guardar Pago'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bank Account Dialog */}
+      <Dialog open={dialog === 'account'} onOpenChange={o => !o && setDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Nueva Cuenta Bancaria</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Nombre *</Label><Input value={formAccName} onChange={e => setFormAccName(e.target.value)} placeholder="Ej: Bancolombia, Nequi" /></div>
+            <div><Label>Saldo inicial</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAccBalance)} onChange={e => setFormAccBalance(parseInput(e.target.value))} /></div>
+            <div><Label>Notas</Label><Input value={formAccNotes} onChange={e => setFormAccNotes(e.target.value)} placeholder="Opcional" /></div>
+            <p className="text-xs text-muted-foreground">El saldo se calcula como: inicial + ingresos − gastos − retiros − pagos de TC.</p>
+            <Button className="w-full" onClick={handleSaveAccount}>Crear Cuenta</Button>
           </div>
         </DialogContent>
       </Dialog>
