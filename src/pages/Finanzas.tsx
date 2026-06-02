@@ -963,6 +963,7 @@ export default function FinanzasPage() {
       </Tabs>
 
       {/* ===== DIALOGS ===== */}
+      {/* Reusable account selector rendered inline below in each dialog */}
 
       {/* Income Dialog */}
       <Dialog open={dialog === 'income'} onOpenChange={o => !o && setDialog(null)}>
