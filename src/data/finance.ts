@@ -1,12 +1,21 @@
 import { supabase } from '@/integrations/supabase/client';
 
 // Types
+export interface BankAccount {
+  id: string;
+  name: string;
+  initial_balance: number;
+  notes: string;
+  created_at: string;
+}
+
 export interface Income {
   id: string;
   amount: number;
   category: string;
   description: string;
   payment_method: string;
+  account_id: string | null;
   created_at: string;
 }
 
@@ -17,6 +26,7 @@ export interface Expense {
   expense_type: 'fixed' | 'occasional';
   description: string;
   payment_method: string;
+  account_id: string | null;
   created_at: string;
 }
 
@@ -25,6 +35,7 @@ export interface ATMWithdrawal {
   amount: number;
   source: string;
   description: string;
+  account_id: string | null;
   created_at: string;
 }
 
@@ -34,6 +45,7 @@ export interface CreditCardTransaction {
   transaction_type: 'purchase' | 'payment';
   category: string;
   description: string;
+  account_id: string | null;
   created_at: string;
 }
 
@@ -108,6 +120,43 @@ export const PAYMENT_FREQUENCIES = [
   { value: 'biweekly', label: 'Quincenal' },
   { value: 'monthly', label: 'Mensual' },
 ] as const;
+
+// ===== Bank Accounts =====
+export async function getBankAccounts() {
+  const { data } = await supabase.from('bank_accounts').select('*').order('created_at', { ascending: true });
+  return (data ?? []) as BankAccount[];
+}
+export async function addBankAccount(a: Omit<BankAccount, 'id' | 'created_at'>) {
+  const { data, error } = await supabase.from('bank_accounts').insert(a).select().single();
+  if (error) throw error;
+  return data as BankAccount;
+}
+export async function updateBankAccount(id: string, updates: Partial<BankAccount>) {
+  const { error } = await supabase.from('bank_accounts').update(updates).eq('id', id);
+  if (error) throw error;
+}
+export async function deleteBankAccount(id: string) {
+  const { error } = await supabase.from('bank_accounts').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/**
+ * Computes the current balance for an account:
+ * initial_balance + incomes - expenses - withdrawals - cc_payments (all scoped to account)
+ */
+export function computeAccountBalance(
+  account: BankAccount,
+  incomes: Income[],
+  expenses: Expense[],
+  withdrawals: ATMWithdrawal[],
+  ccTx: CreditCardTransaction[],
+): number {
+  const inc = incomes.filter(i => i.account_id === account.id).reduce((s, r) => s + Number(r.amount), 0);
+  const exp = expenses.filter(e => e.account_id === account.id).reduce((s, r) => s + Number(r.amount), 0);
+  const wd = withdrawals.filter(w => w.account_id === account.id).reduce((s, r) => s + Number(r.amount), 0);
+  const cc = ccTx.filter(t => t.transaction_type === 'payment' && t.account_id === account.id).reduce((s, r) => s + Number(r.amount), 0);
+  return Number(account.initial_balance) + inc - exp - wd - cc;
+}
 
 // CRUD Functions
 export async function getIncomes() {
@@ -195,7 +244,6 @@ export async function getAllDebtPaymentsTotal(): Promise<number> {
 export async function addDebtPayment(p: Omit<DebtPayment, 'id' | 'created_at'>) {
   const { data, error } = await supabase.from('debt_payments').insert(p).select().single();
   if (error) throw error;
-  // Update remaining amount on debt — fetch fresh data and update atomically
   const { data: debt, error: fetchErr } = await supabase
     .from('debts')
     .select('remaining_amount, due_date')
@@ -303,7 +351,6 @@ export function generateRecurringInstances(payments: UpcomingPayment[]): Upcomin
 
     const endDate = p.recurrence_end ? new Date(p.recurrence_end + 'T12:00:00') : new Date(today.getFullYear(), today.getMonth() + 6, today.getDate());
     let current = new Date(p.due_date + 'T12:00:00');
-    const increment = p.frequency === 'monthly' ? 1 : 0.5; // months
 
     let idx = 0;
     while (current <= endDate) {
@@ -318,7 +365,6 @@ export function generateRecurringInstances(payments: UpcomingPayment[]): Upcomin
       if (p.frequency === 'monthly') {
         current = new Date(current.getFullYear(), current.getMonth() + 1, current.getDate());
       } else {
-        // biweekly: add 15 days
         current = new Date(current.getTime() + 15 * 24 * 60 * 60 * 1000);
       }
     }
@@ -338,7 +384,6 @@ export function getNextQuincena(): Date {
   if (day <= 15) {
     return new Date(year, month, 15);
   } else {
-    // Last day of current month
     return new Date(year, month + 1, 0);
   }
 }
@@ -369,7 +414,6 @@ export async function getSavingsMovements(savingsId: string) {
 export async function addSavingsMovement(m: Omit<SavingsMovement, 'id' | 'created_at'>) {
   const { data, error } = await supabase.from('savings_movements').insert(m).select().single();
   if (error) throw error;
-  // Update current_amount on savings
   const { data: saving, error: fetchErr } = await supabase.from('savings').select('current_amount').eq('id', m.savings_id).single();
   if (fetchErr) throw fetchErr;
   if (saving) {
