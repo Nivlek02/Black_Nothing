@@ -149,10 +149,10 @@ export default function FinanzasPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [i, e, w, c, d, h, up, sv, dpTotal, paidPay, savDep] = await Promise.all([
-        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(), getAllDebtPaymentsTotal(), getTotalPaidUpcomingPayments(), getTotalSavingsDeposits(),
+      const [i, e, w, c, d, h, up, sv, ba, dpTotal, paidPay, savDep] = await Promise.all([
+        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(), getBankAccounts(), getAllDebtPaymentsTotal(), getTotalPaidUpcomingPayments(), getTotalSavingsDeposits(),
       ]);
-      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv); setTotalDebtPayments(dpTotal); setTotalPaidPayments(paidPay); setTotalSavingsDeposits(savDep);
+      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv); setAccounts(ba); setTotalDebtPayments(dpTotal); setTotalPaidPayments(paidPay); setTotalSavingsDeposits(savDep);
     } catch (err) {
       console.error('Error loading finance data:', err);
       toast({ title: 'Error al cargar datos financieros', variant: 'destructive' });
