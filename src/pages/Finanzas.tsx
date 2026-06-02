@@ -1038,13 +1038,22 @@ export default function FinanzasPage() {
           <DialogHeader><DialogTitle>Registrar Retiro</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAmount)} onChange={e => setFormAmount(parseInput(e.target.value))} /></div>
-            <div><Label>Cuenta / Fuente</Label>
+            <div><Label>Cuenta *</Label>
+              {accounts.length === 0 ? (
+                <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
+              ) : (
+                <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
+            <div><Label>Fuente (cajero / canal)</Label>
               <Select value={formSource} onValueChange={setFormSource}><SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{ATM_SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div><Label>Descripción</Label><Input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Opcional" /></div>
-            <Button className="w-full" onClick={handleSaveWithdrawal}>Guardar Retiro</Button>
+            <Button className="w-full" onClick={handleSaveWithdrawal} disabled={accounts.length === 0}>Guardar Retiro</Button>
           </div>
         </DialogContent>
       </Dialog>
