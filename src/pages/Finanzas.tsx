@@ -391,6 +391,7 @@ export default function FinanzasPage() {
       else if (type === 'debt') await deleteDebt(id);
       else if (type === 'upcoming') await deleteUpcomingPayment(id);
       else if (type === 'savings') await deleteSavings(id);
+      else if (type === 'account') await deleteBankAccount(id);
       toast({ title: 'Eliminado correctamente' });
       setDeleteTarget(null); loadAll();
     } catch { toast({ title: 'Error al eliminar', variant: 'destructive' }); }
