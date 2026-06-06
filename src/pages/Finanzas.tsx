@@ -620,10 +620,15 @@ export default function FinanzasPage() {
           {/* Monthly Summary */}
           {monthlySummary.length > 0 && (
             <Card className="card-metallic">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
                   <CalIcon className="h-4 w-4 text-primary" /> Resumen Mensual
                 </CardTitle>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={monthlyPage <= 0} onClick={() => setMonthlyPage(p => Math.max(0, p - 1))}>‹</Button>
+                  <span className="text-[10px] text-muted-foreground min-w-[3rem] text-center">{monthlyPage + 1}/{monthlyTotalPages}</span>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={monthlyPage >= monthlyTotalPages - 1} onClick={() => setMonthlyPage(p => Math.min(monthlyTotalPages - 1, p + 1))}>›</Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <MobileTable>
@@ -638,7 +643,7 @@ export default function FinanzasPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {monthlySummary.map(m => (
+                      {paginatedMonthly.map(m => (
                         <TableRow key={m.key}>
                           <TableCell className="text-xs capitalize">{m.label}</TableCell>
                           <TableCell className="text-xs text-right font-mono-data text-green-400">{fmt(m.income)}</TableCell>
