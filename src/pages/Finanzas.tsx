@@ -147,6 +147,12 @@ export default function FinanzasPage() {
   // History filters
   const [filterType, setFilterType] = useState('all');
 
+  // Pagination states
+  const [monthlyPage, setMonthlyPage] = useState(0);
+  const MONTHS_PER_PAGE = 5;
+
+  const [pendingMonthIdx, setPendingMonthIdx] = useState(0);
+
   const loadAll = useCallback(async () => {
     try {
       const [i, e, w, c, d, h, up, sv, ba, dpTotal, paidPay, savDep] = await Promise.all([
@@ -190,6 +196,25 @@ export default function FinanzasPage() {
   }, [pendingPayments, quincenaDateStr]);
   const quincenaTotal = useMemo(() => quincenaPayments.reduce((s, p) => s + Number(p.amount), 0), [quincenaPayments]);
 
+  // Pending payments grouped by month for pagination
+  const pendingByMonth = useMemo(() => {
+    const groups: Record<string, UpcomingPayment[]> = {};
+    pendingPayments.forEach(p => {
+      const k = p.due_date.slice(0, 7); // YYYY-MM
+      if (!groups[k]) groups[k] = [];
+      groups[k].push(p);
+    });
+    const sortedKeys = Object.keys(groups).sort();
+    return sortedKeys.map(key => ({
+      key,
+      label: new Date(key + '-01').toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }),
+      payments: groups[key].sort((a, b) => a.due_date.localeCompare(b.due_date)),
+      total: groups[key].reduce((s, p) => s + Number(p.amount), 0),
+    }));
+  }, [pendingPayments]);
+  const pendingMonthTotal = pendingByMonth.length;
+  const currentPendingMonth = pendingByMonth[pendingMonthIdx] ?? null;
+
   // Monthly summary grouped by month
   const monthlySummary = useMemo(() => {
     const months: Record<string, { income: number; expense: number; scheduled: number; paid: number }> = {};
@@ -225,6 +250,12 @@ export default function FinanzasPage() {
         ...data,
       }));
   }, [incomes, expenses, ccTx, allPaymentInstances]);
+
+  const monthlyTotalPages = Math.ceil(monthlySummary.length / MONTHS_PER_PAGE) || 1;
+  const paginatedMonthly = useMemo(() => {
+    const start = monthlyPage * MONTHS_PER_PAGE;
+    return monthlySummary.slice(start, start + MONTHS_PER_PAGE);
+  }, [monthlySummary, monthlyPage]);
 
 
   const resetForm = () => {
@@ -549,16 +580,21 @@ export default function FinanzasPage() {
             </CardContent>
           </Card>
 
-          {/* Upcoming payments preview */}
-          {pendingPayments.length > 0 && pendingPayments.length !== quincenaPayments.length && (
+          {/* Upcoming payments preview - paginated by month */}
+          {pendingByMonth.length > 0 && (
             <Card className="card-metallic">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" /> Todos los pagos pendientes ({pendingPayments.length})
+                  <Clock className="h-4 w-4 text-muted-foreground" /> {currentPendingMonth?.label ?? 'Pagos pendientes'}
                 </CardTitle>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={pendingMonthIdx <= 0} onClick={() => setPendingMonthIdx(i => Math.max(0, i - 1))}>‹</Button>
+                  <span className="text-[10px] text-muted-foreground min-w-[3rem] text-center">{pendingMonthIdx + 1}/{pendingMonthTotal}</span>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={pendingMonthIdx >= pendingMonthTotal - 1} onClick={() => setPendingMonthIdx(i => Math.min(pendingMonthTotal - 1, i + 1))}>›</Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                {pendingPayments.slice(0, 5).map(p => {
+                {currentPendingMonth?.payments.map(p => {
                   const days = daysUntil(p.due_date);
                   return (
                     <div key={p.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
@@ -567,16 +603,16 @@ export default function FinanzasPage() {
                           {days <= 0 ? 'Hoy' : days === 1 ? 'Mañana' : `${days}d`}
                         </Badge>
                         <span className="text-sm truncate">{p.name}</span>
+                        <span className="text-[10px] text-muted-foreground">{fmtShortDate(p.due_date)}</span>
                       </div>
                       <span className="font-mono-data text-sm text-warning shrink-0 ml-2">{fmt(p.amount)}</span>
                     </div>
                   );
                 })}
-                {pendingPayments.length > 5 && (
-                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setTab('upcoming')}>
-                    Ver todos ({pendingPayments.length})
-                  </Button>
-                )}
+                <div className="flex justify-between items-center pt-2 border-t border-border">
+                  <span className="text-xs text-muted-foreground">{currentPendingMonth?.payments.length} pago(s)</span>
+                  <span className="font-mono-data text-sm font-bold text-warning">{fmt(currentPendingMonth?.total ?? 0)}</span>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -584,10 +620,15 @@ export default function FinanzasPage() {
           {/* Monthly Summary */}
           {monthlySummary.length > 0 && (
             <Card className="card-metallic">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
                   <CalIcon className="h-4 w-4 text-primary" /> Resumen Mensual
                 </CardTitle>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={monthlyPage <= 0} onClick={() => setMonthlyPage(p => Math.max(0, p - 1))}>‹</Button>
+                  <span className="text-[10px] text-muted-foreground min-w-[3rem] text-center">{monthlyPage + 1}/{monthlyTotalPages}</span>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={monthlyPage >= monthlyTotalPages - 1} onClick={() => setMonthlyPage(p => Math.min(monthlyTotalPages - 1, p + 1))}>›</Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <MobileTable>
@@ -602,7 +643,7 @@ export default function FinanzasPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {monthlySummary.map(m => (
+                      {paginatedMonthly.map(m => (
                         <TableRow key={m.key}>
                           <TableCell className="text-xs capitalize">{m.label}</TableCell>
                           <TableCell className="text-xs text-right font-mono-data text-green-400">{fmt(m.income)}</TableCell>
