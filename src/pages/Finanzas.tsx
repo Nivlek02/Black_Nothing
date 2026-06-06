@@ -147,6 +147,12 @@ export default function FinanzasPage() {
   // History filters
   const [filterType, setFilterType] = useState('all');
 
+  // Pagination states
+  const [monthlyPage, setMonthlyPage] = useState(0);
+  const MONTHS_PER_PAGE = 5;
+
+  const [pendingMonthIdx, setPendingMonthIdx] = useState(0);
+
   const loadAll = useCallback(async () => {
     try {
       const [i, e, w, c, d, h, up, sv, ba, dpTotal, paidPay, savDep] = await Promise.all([
