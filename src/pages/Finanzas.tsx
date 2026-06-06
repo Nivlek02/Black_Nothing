@@ -232,6 +232,12 @@ export default function FinanzasPage() {
       }));
   }, [incomes, expenses, ccTx, allPaymentInstances]);
 
+  const monthlyTotalPages = Math.ceil(monthlySummary.length / MONTHS_PER_PAGE) || 1;
+  const paginatedMonthly = useMemo(() => {
+    const start = monthlyPage * MONTHS_PER_PAGE;
+    return monthlySummary.slice(start, start + MONTHS_PER_PAGE);
+  }, [monthlySummary, monthlyPage]);
+
 
   const resetForm = () => {
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
