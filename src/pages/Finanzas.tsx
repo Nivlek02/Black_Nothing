@@ -207,7 +207,7 @@ export default function FinanzasPage() {
     const sortedKeys = Object.keys(groups).sort();
     return sortedKeys.map(key => ({
       key,
-      label: new Date(key + '-01').toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }),
+      label: new Date(key + '-01T12:00:00').toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }),
       payments: groups[key].sort((a, b) => a.due_date.localeCompare(b.due_date)),
       total: groups[key].reduce((s, p) => s + Number(p.amount), 0),
     }));
