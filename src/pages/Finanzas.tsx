@@ -196,6 +196,25 @@ export default function FinanzasPage() {
   }, [pendingPayments, quincenaDateStr]);
   const quincenaTotal = useMemo(() => quincenaPayments.reduce((s, p) => s + Number(p.amount), 0), [quincenaPayments]);
 
+  // Pending payments grouped by month for pagination
+  const pendingByMonth = useMemo(() => {
+    const groups: Record<string, UpcomingPayment[]> = {};
+    pendingPayments.forEach(p => {
+      const k = p.due_date.slice(0, 7); // YYYY-MM
+      if (!groups[k]) groups[k] = [];
+      groups[k].push(p);
+    });
+    const sortedKeys = Object.keys(groups).sort();
+    return sortedKeys.map(key => ({
+      key,
+      label: new Date(key + '-01').toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }),
+      payments: groups[key].sort((a, b) => a.due_date.localeCompare(b.due_date)),
+      total: groups[key].reduce((s, p) => s + Number(p.amount), 0),
+    }));
+  }, [pendingPayments]);
+  const pendingMonthTotal = pendingByMonth.length;
+  const currentPendingMonth = pendingByMonth[pendingMonthIdx] ?? null;
+
   // Monthly summary grouped by month
   const monthlySummary = useMemo(() => {
     const months: Record<string, { income: number; expense: number; scheduled: number; paid: number }> = {};
