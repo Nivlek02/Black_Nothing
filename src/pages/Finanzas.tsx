@@ -497,6 +497,25 @@ export default function FinanzasPage() {
             </CardContent>
           </Card>
 
+          {/* Disponible Real */}
+          <Card className="card-metallic border-info/30">
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><Wallet className="h-4 w-4 text-info" /> Disponible Real</CardTitle></CardHeader>
+            <CardContent>
+              {(() => {
+                const netBalance = totalIncome - totalExpense - totalWithdrawals;
+                const disponible = netBalance - ccBalance - quincenaTotal;
+                return (
+                  <>
+                    <p className={`text-2xl sm:text-3xl font-bold font-mono-data ${disponible >= 0 ? 'text-info' : 'text-destructive'}`}>
+                      {fmt(disponible)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Balance neto − Saldo TC − Pagos quincena</p>
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
           {/* Quincena Summary */}
           <Card className="card-metallic border-warning/30">
             <CardHeader className="pb-2">
