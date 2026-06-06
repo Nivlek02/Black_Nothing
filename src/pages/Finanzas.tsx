@@ -580,16 +580,21 @@ export default function FinanzasPage() {
             </CardContent>
           </Card>
 
-          {/* Upcoming payments preview */}
-          {pendingPayments.length > 0 && pendingPayments.length !== quincenaPayments.length && (
+          {/* Upcoming payments preview - paginated by month */}
+          {pendingByMonth.length > 0 && (
             <Card className="card-metallic">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" /> Todos los pagos pendientes ({pendingPayments.length})
+                  <Clock className="h-4 w-4 text-muted-foreground" /> {currentPendingMonth?.label ?? 'Pagos pendientes'}
                 </CardTitle>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={pendingMonthIdx <= 0} onClick={() => setPendingMonthIdx(i => Math.max(0, i - 1))}>‹</Button>
+                  <span className="text-[10px] text-muted-foreground min-w-[3rem] text-center">{pendingMonthIdx + 1}/{pendingMonthTotal}</span>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={pendingMonthIdx >= pendingMonthTotal - 1} onClick={() => setPendingMonthIdx(i => Math.min(pendingMonthTotal - 1, i + 1))}>›</Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                {pendingPayments.slice(0, 5).map(p => {
+                {currentPendingMonth?.payments.map(p => {
                   const days = daysUntil(p.due_date);
                   return (
                     <div key={p.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
@@ -598,16 +603,16 @@ export default function FinanzasPage() {
                           {days <= 0 ? 'Hoy' : days === 1 ? 'Mañana' : `${days}d`}
                         </Badge>
                         <span className="text-sm truncate">{p.name}</span>
+                        <span className="text-[10px] text-muted-foreground">{fmtShortDate(p.due_date)}</span>
                       </div>
                       <span className="font-mono-data text-sm text-warning shrink-0 ml-2">{fmt(p.amount)}</span>
                     </div>
                   );
                 })}
-                {pendingPayments.length > 5 && (
-                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setTab('upcoming')}>
-                    Ver todos ({pendingPayments.length})
-                  </Button>
-                )}
+                <div className="flex justify-between items-center pt-2 border-t border-border">
+                  <span className="text-xs text-muted-foreground">{currentPendingMonth?.payments.length} pago(s)</span>
+                  <span className="font-mono-data text-sm font-bold text-warning">{fmt(currentPendingMonth?.total ?? 0)}</span>
+                </div>
               </CardContent>
             </Card>
           )}
