@@ -300,6 +300,164 @@ export type Database = {
           },
         ]
       }
+      pm_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          mime_type: string | null
+          requirement_id: string
+          size_bytes: number | null
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          mime_type?: string | null
+          requirement_id: string
+          size_bytes?: number | null
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          mime_type?: string | null
+          requirement_id?: string
+          size_bytes?: number | null
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pm_attachments_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "pm_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pm_requirements: {
+        Row: {
+          areas: string | null
+          business_goal: string | null
+          client: string | null
+          complexity: string | null
+          created_at: string
+          dependencies: string | null
+          description: string | null
+          id: string
+          impact: string | null
+          name: string
+          observations: string | null
+          priority: Database["public"]["Enums"]["pm_priority"]
+          request_date: string
+          risks: string | null
+          status: Database["public"]["Enums"]["pm_status"]
+          updated_at: string
+        }
+        Insert: {
+          areas?: string | null
+          business_goal?: string | null
+          client?: string | null
+          complexity?: string | null
+          created_at?: string
+          dependencies?: string | null
+          description?: string | null
+          id?: string
+          impact?: string | null
+          name: string
+          observations?: string | null
+          priority?: Database["public"]["Enums"]["pm_priority"]
+          request_date?: string
+          risks?: string | null
+          status?: Database["public"]["Enums"]["pm_status"]
+          updated_at?: string
+        }
+        Update: {
+          areas?: string | null
+          business_goal?: string | null
+          client?: string | null
+          complexity?: string | null
+          created_at?: string
+          dependencies?: string | null
+          description?: string | null
+          id?: string
+          impact?: string | null
+          name?: string
+          observations?: string | null
+          priority?: Database["public"]["Enums"]["pm_priority"]
+          request_date?: string
+          risks?: string | null
+          status?: Database["public"]["Enums"]["pm_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pm_tasks: {
+        Row: {
+          assignee: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          kind: Database["public"]["Enums"]["pm_task_kind"]
+          parent_id: string | null
+          priority: Database["public"]["Enums"]["pm_priority"]
+          requirement_id: string
+          sort_order: number
+          status: Database["public"]["Enums"]["pm_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["pm_task_kind"]
+          parent_id?: string | null
+          priority?: Database["public"]["Enums"]["pm_priority"]
+          requirement_id: string
+          sort_order?: number
+          status?: Database["public"]["Enums"]["pm_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["pm_task_kind"]
+          parent_id?: string | null
+          priority?: Database["public"]["Enums"]["pm_priority"]
+          requirement_id?: string
+          sort_order?: number
+          status?: Database["public"]["Enums"]["pm_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pm_tasks_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "pm_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_tasks_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "pm_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_subscriptions: {
         Row: {
           created_at: string
@@ -463,7 +621,18 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      pm_priority: "alta" | "media" | "baja"
+      pm_status:
+        | "pendiente"
+        | "en_analisis"
+        | "listo_dev"
+        | "en_desarrollo"
+        | "en_qa"
+        | "en_revision"
+        | "aprobado"
+        | "desplegado"
+        | "cancelado"
+      pm_task_kind: "epic" | "story" | "task" | "subtask"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -590,6 +759,20 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      pm_priority: ["alta", "media", "baja"],
+      pm_status: [
+        "pendiente",
+        "en_analisis",
+        "listo_dev",
+        "en_desarrollo",
+        "en_qa",
+        "en_revision",
+        "aprobado",
+        "desplegado",
+        "cancelado",
+      ],
+      pm_task_kind: ["epic", "story", "task", "subtask"],
+    },
   },
 } as const

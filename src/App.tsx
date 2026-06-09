@@ -10,6 +10,7 @@ import { initializeIfNeeded } from "./data/store";
 import AgendaPage from "./pages/Agenda";
 import CalendarioPage from "./pages/Calendario";
 import FinanzasPage from "./pages/Finanzas";
+import ProjectManagementPage from "./pages/ProjectManagement";
 import NotFound from "./pages/NotFound";
 import { Navigate } from "react-router-dom";
 
@@ -33,6 +34,7 @@ const App = () => {
               <Route path="/agenda" element={<AgendaPage />} />
               <Route path="/calendario" element={<CalendarioPage />} />
               <Route path="/finanzas" element={<FinanzasPage />} />
+              <Route path="/pm" element={<ProjectManagementPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </DashboardLayout>
