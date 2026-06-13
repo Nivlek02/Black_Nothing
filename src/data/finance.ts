@@ -5,7 +5,6 @@ export interface BankAccount {
   id: string;
   name: string;
   initial_balance: number;
-  account_type?: 'bank' | 'cash';
   notes: string;
   created_at: string;
 }
@@ -122,6 +121,24 @@ export const PAYMENT_FREQUENCIES = [
   { value: 'biweekly', label: 'Quincenal' },
   { value: 'monthly', label: 'Mensual' },
 ] as const;
+
+const NOTES_TYPE_PREFIX = '##TYPE:';
+
+export function getAccountTypeFromNotes(notes: string | null): 'bank' | 'cash' {
+  if (!notes) return 'bank';
+  if (notes.startsWith(`${NOTES_TYPE_PREFIX}bank##`)) return 'bank';
+  if (notes.startsWith(`${NOTES_TYPE_PREFIX}cash##`)) return 'cash';
+  return 'bank';
+}
+
+export function encodeNotesWithType(notes: string, type: 'bank' | 'cash'): string {
+  return `${NOTES_TYPE_PREFIX}${type}##${notes}`;
+}
+
+export function stripNotesType(notes: string | null): string {
+  if (!notes) return '';
+  return notes.replace(/^##TYPE:(bank|cash)##/, '');
+}
 
 // ===== Bank Accounts =====
 export async function getBankAccounts() {

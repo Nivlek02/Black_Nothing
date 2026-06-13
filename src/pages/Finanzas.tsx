@@ -32,6 +32,7 @@ import {
   getSavings, addSavings, updateSavings, deleteSavings,
   getSavingsMovements, addSavingsMovement,
   getBankAccounts, addBankAccount, deleteBankAccount, computeAccountBalance,
+  getAccountTypeFromNotes, encodeNotesWithType, stripNotesType,
 } from '@/data/finance';
 
 function fmt(n: number) {
@@ -182,8 +183,8 @@ export default function FinanzasPage() {
   const totalWithdrawals = useMemo(() => withdrawals.reduce((s, r) => s + Number(r.amount), 0), [withdrawals]);
   const totalSavings = useMemo(() => savings.reduce((s, r) => s + Number(r.current_amount), 0), [savings]);
   const totalDebts = useMemo(() => debts.filter(d => d.status === 'active').reduce((s, d) => s + Number(d.remaining_amount), 0), [debts]);
-  const bankAccounts = useMemo(() => accounts.filter(a => a.account_type === 'bank' || !a.account_type), [accounts]);
-  const cashAccounts = useMemo(() => accounts.filter(a => a.account_type === 'cash'), [accounts]);
+  const bankAccounts = useMemo(() => accounts.filter(a => getAccountTypeFromNotes(a.notes) !== 'cash'), [accounts]);
+  const cashAccounts = useMemo(() => accounts.filter(a => getAccountTypeFromNotes(a.notes) === 'cash'), [accounts]);
   const totalAccountBalance = useMemo(() =>
     accounts.reduce((s, a) => s + computeAccountBalance(a, incomes, expenses, withdrawals, ccTx), 0),
     [accounts, incomes, expenses, withdrawals, ccTx]
@@ -316,24 +317,24 @@ export default function FinanzasPage() {
   const handleEditAccount = (a: BankAccount) => {
     setFormAccName(a.name);
     setFormAccBalance(String(a.initial_balance));
-    setFormAccType(a.account_type ?? 'bank');
-    setFormAccNotes(a.notes);
+    setFormAccType(getAccountTypeFromNotes(a.notes));
+    setFormAccNotes(stripNotesType(a.notes));
     setEditingAccountId(a.id);
     setDialog('account');
   };
   const handleSaveAccount = async () => {
     if (!formAccName) return;
     try {
+      const encodedNotes = formAccNotes ? encodeNotesWithType(formAccNotes, formAccType) : encodeNotesWithType('', formAccType);
       if (editingAccountId) {
         await updateBankAccount(editingAccountId, {
           name: formAccName,
           initial_balance: Number(formAccBalance) || 0,
-          account_type: formAccType,
-          notes: formAccNotes,
+          notes: encodedNotes,
         });
         toast({ title: 'Cuenta actualizada' });
       } else {
-        await addBankAccount({ name: formAccName, initial_balance: Number(formAccBalance) || 0, account_type: formAccType, notes: formAccNotes });
+        await addBankAccount({ name: formAccName, initial_balance: Number(formAccBalance) || 0, notes: encodedNotes });
         toast({ title: 'Cuenta creada' });
       }
       setDialog(null); loadAll();
@@ -763,11 +764,11 @@ export default function FinanzasPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-semibold text-foreground flex items-center gap-2">
-                          {a.account_type === 'cash' ? <Wallet className="h-4 w-4 text-emerald-400" /> : <Landmark className="h-4 w-4 text-primary" />}
+                          {getAccountTypeFromNotes(a.notes) === 'cash' ? <Wallet className="h-4 w-4 text-emerald-400" /> : <Landmark className="h-4 w-4 text-primary" />}
                           {a.name}
-                          <Badge variant="outline" className="text-[10px]">{a.account_type === 'cash' ? 'Efectivo' : 'Banco'}</Badge>
+                          <Badge variant="outline" className="text-[10px]">{getAccountTypeFromNotes(a.notes) === 'cash' ? 'Efectivo' : 'Banco'}</Badge>
                         </p>
-                        {a.notes && <p className="text-xs text-muted-foreground mt-1">{a.notes}</p>}
+                        {stripNotesType(a.notes) && <p className="text-xs text-muted-foreground mt-1">{stripNotesType(a.notes)}</p>}
                       </div>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleEditAccount(a)}>Editar</Button>
