@@ -10,12 +10,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, TrendingUp, TrendingDown, CreditCard, Landmark, PiggyBank, Plus,
   Trash2, ArrowUpCircle, ArrowDownCircle, Banknote, Receipt, HandCoins, History,
-  Calendar as CalIcon, CheckCircle2, Clock, Wallet, Target, ArrowDown, ArrowUp
+  Calendar as CalIcon, CheckCircle2, Clock, Wallet, Target, ArrowDown, ArrowUp, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import {
   Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement, UpcomingPayment, Savings, SavingsMovement, BankAccount,
@@ -63,12 +62,7 @@ function daysUntil(dateStr: string) {
 }
 
 function MobileTable({ children }: { children: React.ReactNode }) {
-  return (
-    <ScrollArea className="w-full whitespace-nowrap">
-      <div className="min-w-[600px]">{children}</div>
-      <ScrollBar orientation="horizontal" />
-    </ScrollArea>
-  );
+  return <div className="w-full overflow-x-auto">{children}</div>;
 }
 
 export default function FinanzasPage() {
@@ -157,6 +151,14 @@ export default function FinanzasPage() {
 
   const [pendingMonthIdx, setPendingMonthIdx] = useState(0);
 
+  // Pagination for tables
+  const [incomePage, setIncomePage] = useState(0);
+  const [incomePageSize, setIncomePageSize] = useState("10");
+  const [expensePage, setExpensePage] = useState(0);
+  const [expensePageSize, setExpensePageSize] = useState("10");
+  const [historyPage, setHistoryPage] = useState(0);
+  const [historyPageSize, setHistoryPageSize] = useState("10");
+
   const loadAll = useCallback(async () => {
     try {
       const [i, e, w, c, d, h, up, sv, ba, dpTotal, paidPay, savDep] = await Promise.all([
@@ -176,6 +178,10 @@ export default function FinanzasPage() {
   const totalWithdrawals = useMemo(() => withdrawals.reduce((s, r) => s + Number(r.amount), 0), [withdrawals]);
   const totalSavings = useMemo(() => savings.reduce((s, r) => s + Number(r.current_amount), 0), [savings]);
   const totalDebts = useMemo(() => debts.filter(d => d.status === 'active').reduce((s, d) => s + Number(d.remaining_amount), 0), [debts]);
+  const totalAccountBalance = useMemo(() =>
+    accounts.reduce((s, a) => s + computeAccountBalance(a, incomes, expenses, withdrawals, ccTx), 0),
+    [accounts, incomes, expenses, withdrawals, ccTx]
+  );
 
   // Credit card
   const ccPurchases = useMemo(() => ccTx.filter(t => t.transaction_type === 'purchase').reduce((s, t) => s + Number(t.amount), 0), [ccTx]);
@@ -199,6 +205,8 @@ export default function FinanzasPage() {
     return pendingPayments.filter(p => p.due_date >= todayStr && p.due_date <= quincenaDateStr);
   }, [pendingPayments, quincenaDateStr]);
   const quincenaTotal = useMemo(() => quincenaPayments.reduce((s, p) => s + Number(p.amount), 0), [quincenaPayments]);
+
+  const disponible = totalAccountBalance - ccBalance - quincenaTotal;
 
   // Pending payments grouped by month for pagination
   const pendingByMonth = useMemo(() => {
@@ -486,6 +494,34 @@ export default function FinanzasPage() {
 
   const freqLabel = (f: string) => PAYMENT_FREQUENCIES.find(pf => pf.value === f)?.label || f;
 
+  function PaginationBar({ page, pageSize, total, onPageChange, onPageSizeChange }: { page: number; pageSize: string; total: number; onPageChange: (p: number) => void; onPageSizeChange: (s: string) => void }) {
+    const totalPages = Math.max(1, Math.ceil(total / Number(pageSize)));
+    return (
+      <div className="flex items-center justify-between gap-2 p-3 flex-wrap">
+        <span className="text-xs text-muted-foreground">{total} registros</span>
+        <div className="flex items-center gap-2">
+          <Select value={pageSize} onValueChange={v => { onPageSizeChange(v); onPageChange(0); }}>
+            <SelectTrigger className="h-8 w-16 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === 0} onClick={() => onPageChange(page - 1)}>
+              <ArrowLeft className="h-3 w-3" />
+            </Button>
+            <span className="text-xs text-muted-foreground min-w-[60px] text-center">{page + 1} / {totalPages}</span>
+            <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1} onClick={() => onPageChange(page + 1)}>
+              <ArrowRight className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
@@ -547,32 +583,23 @@ export default function FinanzasPage() {
             </Card>
           </div>
 
-          <Card className="card-metallic">
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><DollarSign className="h-4 w-4 text-primary" /> Balance Neto</CardTitle></CardHeader>
+          <Card className="card-metallic border-info/30">
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><Landmark className="h-4 w-4 text-info" /> Total Dinero en Cuentas</CardTitle></CardHeader>
             <CardContent>
-              <p className={`text-2xl sm:text-3xl font-bold font-mono-data ${totalIncome - totalExpense - totalWithdrawals >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                {fmt(totalIncome - totalExpense - totalWithdrawals)}
+              <p className={`text-2xl sm:text-3xl font-bold font-mono-data ${totalAccountBalance >= 0 ? 'text-info' : 'text-destructive'}`}>
+                {fmt(totalAccountBalance)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Ingresos − Gastos − Retiros (incluye abonos, pagos TC, pagos pendientes y depósitos ahorro)</p>
+              <p className="text-xs text-muted-foreground mt-1">Suma de saldos de todas las cuentas bancarias</p>
             </CardContent>
           </Card>
 
-          {/* Disponible Real */}
-          <Card className="card-metallic border-info/30">
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><Wallet className="h-4 w-4 text-info" /> Disponible Real</CardTitle></CardHeader>
+          <Card className="card-metallic border-emerald-500/30">
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><DollarSign className="h-4 w-4 text-emerald-400" /> Dinero Disponible</CardTitle></CardHeader>
             <CardContent>
-              {(() => {
-                const netBalance = totalIncome - totalExpense - totalWithdrawals;
-                const disponible = netBalance - ccBalance - quincenaTotal;
-                return (
-                  <>
-                    <p className={`text-2xl sm:text-3xl font-bold font-mono-data ${disponible >= 0 ? 'text-info' : 'text-destructive'}`}>
-                      {fmt(disponible)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">Balance neto − Saldo TC − Pagos quincena</p>
-                  </>
-                );
-              })()}
+              <p className={`text-2xl sm:text-3xl font-bold font-mono-data ${disponible >= 0 ? 'text-emerald-400' : 'text-destructive'}`}>
+                {fmt(disponible)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Saldo cuentas − Saldo TC − Pagos quincena</p>
             </CardContent>
           </Card>
 
@@ -863,7 +890,7 @@ export default function FinanzasPage() {
                   <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Categoría</TableHead><TableHead>Método</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
                   <TableBody>
                     {incomes.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin ingresos registrados</TableCell></TableRow>}
-                    {incomes.map(i => (
+                    {incomes.slice(incomePage * Number(incomePageSize), (incomePage + 1) * Number(incomePageSize)).map(i => (
                       <TableRow key={i.id}>
                         <TableCell className="font-mono-data text-xs">{fmtDate(i.created_at)}</TableCell>
                         <TableCell><Badge variant="secondary">{i.category}</Badge></TableCell>
@@ -876,6 +903,7 @@ export default function FinanzasPage() {
                   </TableBody>
                 </Table>
               </MobileTable>
+              <PaginationBar page={incomePage} pageSize={incomePageSize} total={incomes.length} onPageChange={setIncomePage} onPageSizeChange={setIncomePageSize} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -893,7 +921,7 @@ export default function FinanzasPage() {
                   <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Método</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
                   <TableBody>
                     {expenses.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Sin gastos registrados</TableCell></TableRow>}
-                    {expenses.map(e => (
+                    {expenses.slice(expensePage * Number(expensePageSize), (expensePage + 1) * Number(expensePageSize)).map(e => (
                       <TableRow key={e.id}>
                         <TableCell className="font-mono-data text-xs">{fmtDate(e.created_at)}</TableCell>
                         <TableCell><Badge variant={e.expense_type === 'fixed' ? 'default' : 'secondary'}>{e.expense_type === 'fixed' ? 'Fijo' : 'Ocasional'}</Badge></TableCell>
@@ -907,6 +935,7 @@ export default function FinanzasPage() {
                   </TableBody>
                 </Table>
               </MobileTable>
+              <PaginationBar page={expensePage} pageSize={expensePageSize} total={expenses.length} onPageChange={setExpensePage} onPageSizeChange={setExpensePageSize} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -1033,7 +1062,7 @@ export default function FinanzasPage() {
                   <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Método</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {filteredHistory.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin movimientos</TableCell></TableRow>}
-                    {filteredHistory.map(m => (
+                    {filteredHistory.slice(historyPage * Number(historyPageSize), (historyPage + 1) * Number(historyPageSize)).map(m => (
                       <TableRow key={m.id}>
                         <TableCell className="font-mono-data text-xs">{fmtDate(m.created_at)}</TableCell>
                         <TableCell><Badge variant={m.type === 'income' ? 'default' : m.type === 'expense' ? 'destructive' : 'secondary'}>{MOVEMENT_TYPE_LABELS[m.type]}</Badge></TableCell>
@@ -1046,6 +1075,7 @@ export default function FinanzasPage() {
                   </TableBody>
                 </Table>
               </MobileTable>
+              <PaginationBar page={historyPage} pageSize={historyPageSize} total={filteredHistory.length} onPageChange={setHistoryPage} onPageSizeChange={setHistoryPageSize} />
             </CardContent>
           </Card>
         </TabsContent>
