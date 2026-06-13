@@ -5,6 +5,7 @@ export interface BankAccount {
   id: string;
   name: string;
   initial_balance: number;
+  account_type?: 'bank' | 'cash';
   notes: string;
   created_at: string;
 }
@@ -33,7 +34,7 @@ export interface Expense {
 export interface ATMWithdrawal {
   id: string;
   amount: number;
-  source: string;
+  source?: string;
   description: string;
   account_id: string | null;
   created_at: string;

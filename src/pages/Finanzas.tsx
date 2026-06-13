@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import {
   Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement, UpcomingPayment, Savings, SavingsMovement, BankAccount,
-  INCOME_CATEGORIES, EXPENSE_CATEGORIES, PAYMENT_METHODS, ATM_SOURCES, MOVEMENT_TYPE_LABELS, UPCOMING_PAYMENT_CATEGORIES, PAYMENT_FREQUENCIES,
+  INCOME_CATEGORIES, EXPENSE_CATEGORIES, PAYMENT_METHODS, MOVEMENT_TYPE_LABELS, UPCOMING_PAYMENT_CATEGORIES, PAYMENT_FREQUENCIES,
   getIncomes, addIncome, deleteIncome,
   getExpenses, addExpense, deleteExpense,
   getWithdrawals, addWithdrawal, deleteWithdrawal,
@@ -102,7 +102,6 @@ export default function FinanzasPage() {
   const [formDescription, setFormDescription] = useState('');
   const [formMethod, setFormMethod] = useState('Efectivo');
   const [formExpenseType, setFormExpenseType] = useState('occasional');
-  const [formSource, setFormSource] = useState('Cuenta principal');
   const [formCcType, setFormCcType] = useState('purchase');
   const [formCcPayMode, setFormCcPayMode] = useState<'total' | 'single'>('total');
   const [formCcPayTarget, setFormCcPayTarget] = useState('');
@@ -110,7 +109,11 @@ export default function FinanzasPage() {
   // Bank account form
   const [formAccName, setFormAccName] = useState('');
   const [formAccBalance, setFormAccBalance] = useState('');
+  const [formAccType, setFormAccType] = useState<'bank' | 'cash'>('bank');
   const [formAccNotes, setFormAccNotes] = useState('');
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+  // Withdrawal destination cash account
+  const [formDestAccountId, setFormDestAccountId] = useState<string>('');
   // Debt form
   const [formDebtName, setFormDebtName] = useState('');
   const [formDebtTotal, setFormDebtTotal] = useState('');
@@ -179,6 +182,8 @@ export default function FinanzasPage() {
   const totalWithdrawals = useMemo(() => withdrawals.reduce((s, r) => s + Number(r.amount), 0), [withdrawals]);
   const totalSavings = useMemo(() => savings.reduce((s, r) => s + Number(r.current_amount), 0), [savings]);
   const totalDebts = useMemo(() => debts.filter(d => d.status === 'active').reduce((s, d) => s + Number(d.remaining_amount), 0), [debts]);
+  const bankAccounts = useMemo(() => accounts.filter(a => a.account_type === 'bank' || !a.account_type), [accounts]);
+  const cashAccounts = useMemo(() => accounts.filter(a => a.account_type === 'cash'), [accounts]);
   const totalAccountBalance = useMemo(() =>
     accounts.reduce((s, a) => s + computeAccountBalance(a, incomes, expenses, withdrawals, ccTx), 0),
     [accounts, incomes, expenses, withdrawals, ccTx]
@@ -273,9 +278,9 @@ export default function FinanzasPage() {
 
   const resetForm = () => {
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
-    setFormExpenseType('occasional'); setFormSource('Cuenta principal'); setFormCcType('purchase'); setFormCcPayMode('total'); setFormCcPayTarget('');
+    setFormExpenseType('occasional'); setFormCcType('purchase'); setFormCcPayMode('total'); setFormCcPayTarget('');
     setFormAccountId(accounts[0]?.id ?? '');
-    setFormAccName(''); setFormAccBalance(''); setFormAccNotes('');
+    setFormAccName(''); setFormAccBalance(''); setFormAccType('bank'); setFormAccNotes(''); setEditingAccountId(null); setFormDestAccountId('');
     setFormDebtName(''); setFormDebtTotal(''); setFormDebtStart(new Date().toISOString().split('T')[0]);
     setFormDebtDue(''); setFormDebtNotes('');
     setFormDebtPayAmount(''); setFormDebtPayNotes(''); setFormDebtPayId('');
@@ -308,13 +313,31 @@ export default function FinanzasPage() {
   };
 
   // Handlers
+  const handleEditAccount = (a: BankAccount) => {
+    setFormAccName(a.name);
+    setFormAccBalance(String(a.initial_balance));
+    setFormAccType(a.account_type ?? 'bank');
+    setFormAccNotes(a.notes);
+    setEditingAccountId(a.id);
+    setDialog('account');
+  };
   const handleSaveAccount = async () => {
     if (!formAccName) return;
     try {
-      await addBankAccount({ name: formAccName, initial_balance: Number(formAccBalance) || 0, notes: formAccNotes });
-      toast({ title: 'Cuenta creada' });
+      if (editingAccountId) {
+        await updateBankAccount(editingAccountId, {
+          name: formAccName,
+          initial_balance: Number(formAccBalance) || 0,
+          account_type: formAccType,
+          notes: formAccNotes,
+        });
+        toast({ title: 'Cuenta actualizada' });
+      } else {
+        await addBankAccount({ name: formAccName, initial_balance: Number(formAccBalance) || 0, account_type: formAccType, notes: formAccNotes });
+        toast({ title: 'Cuenta creada' });
+      }
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al crear cuenta', variant: 'destructive' }); }
+    } catch { toast({ title: 'Error al guardar cuenta', variant: 'destructive' }); }
   };
   const handleSaveIncome = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
@@ -337,10 +360,13 @@ export default function FinanzasPage() {
   };
   const handleSaveWithdrawal = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
-    if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
+    if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona una cuenta de banco', variant: 'destructive' }); return; }
     if (!checkSufficient(formAccountId, Number(formAmount))) return;
+    if (accounts.length > 0 && !formDestAccountId) { toast({ title: 'Selecciona la cuenta de efectivo destino', variant: 'destructive' }); return; }
+    if (formAccountId === formDestAccountId) { toast({ title: 'La cuenta origen y destino deben ser diferentes', variant: 'destructive' }); return; }
     try {
-      await addWithdrawal({ amount: Number(formAmount), source: formSource, description: formDescription, account_id: formAccountId || null });
+      await addWithdrawal({ amount: Number(formAmount), description: formDescription, account_id: formAccountId || null });
+      await addIncome({ amount: Number(formAmount), category: 'Transferencia', description: `Retiro desde cuenta: ${formDescription || 'Sin descripción'}`, payment_method: 'Efectivo', account_id: formDestAccountId || null });
       toast({ title: 'Retiro registrado' });
       setDialog(null); loadAll();
     } catch { toast({ title: 'Error al registrar retiro', variant: 'destructive' }); }
@@ -736,10 +762,17 @@ export default function FinanzasPage() {
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-semibold text-foreground flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" />{a.name}</p>
+                        <p className="font-semibold text-foreground flex items-center gap-2">
+                          {a.account_type === 'cash' ? <Wallet className="h-4 w-4 text-emerald-400" /> : <Landmark className="h-4 w-4 text-primary" />}
+                          {a.name}
+                          <Badge variant="outline" className="text-[10px]">{a.account_type === 'cash' ? 'Efectivo' : 'Banco'}</Badge>
+                        </p>
                         {a.notes && <p className="text-xs text-muted-foreground mt-1">{a.notes}</p>}
                       </div>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'account', id: a.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleEditAccount(a)}>Editar</Button>
+                        <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'account', id: a.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
                     </div>
                     <div className="pt-2 border-t border-border">
                       <p className="text-xs text-muted-foreground">Saldo disponible</p>
@@ -1155,25 +1188,29 @@ export default function FinanzasPage() {
       {/* Withdrawal Dialog */}
       <Dialog open={dialog === 'withdrawal'} onOpenChange={o => !o && setDialog(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Registrar Retiro</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Transferir a Efectivo</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAmount)} onChange={e => setFormAmount(parseInput(e.target.value))} /></div>
-            <div><Label>Cuenta *</Label>
-              {accounts.length === 0 ? (
-                <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
+            <div><Label>Cuenta origen (Banco) *</Label>
+              {bankAccounts.length === 0 ? (
+                <p className="text-xs text-warning">No hay cuentas de banco. Crea una en la pestaña Cuentas.</p>
               ) : (
-                <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
-                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar banco" /></SelectTrigger>
+                  <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
                 </Select>
               )}
             </div>
-            <div><Label>Fuente (cajero / canal)</Label>
-              <Select value={formSource} onValueChange={setFormSource}><SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{ATM_SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
+            <div><Label>Cuenta destino (Efectivo) *</Label>
+              {cashAccounts.length === 0 ? (
+                <p className="text-xs text-warning">No hay cuentas de efectivo. Crea una en la pestaña Cuentas.</p>
+              ) : (
+                <Select value={formDestAccountId} onValueChange={setFormDestAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar efectivo" /></SelectTrigger>
+                  <SelectContent>{cashAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
             </div>
             <div><Label>Descripción</Label><Input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Opcional" /></div>
-            <Button className="w-full" onClick={handleSaveWithdrawal} disabled={accounts.length === 0}>Guardar Retiro</Button>
+            <Button className="w-full" onClick={handleSaveWithdrawal} disabled={bankAccounts.length === 0 || cashAccounts.length === 0}>Transferir a Efectivo</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1249,13 +1286,22 @@ export default function FinanzasPage() {
       {/* Bank Account Dialog */}
       <Dialog open={dialog === 'account'} onOpenChange={o => !o && setDialog(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Nueva Cuenta Bancaria</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingAccountId ? 'Editar Cuenta' : 'Nueva Cuenta'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Nombre *</Label><Input value={formAccName} onChange={e => setFormAccName(e.target.value)} placeholder="Ej: Bancolombia, Nequi" /></div>
+            <div><Label>Tipo</Label>
+              <Select value={formAccType} onValueChange={v => setFormAccType(v as 'bank' | 'cash')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank">Banco</SelectItem>
+                  <SelectItem value="cash">Efectivo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div><Label>Saldo inicial</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAccBalance)} onChange={e => setFormAccBalance(parseInput(e.target.value))} /></div>
             <div><Label>Notas</Label><Input value={formAccNotes} onChange={e => setFormAccNotes(e.target.value)} placeholder="Opcional" /></div>
             <p className="text-xs text-muted-foreground">El saldo se calcula como: inicial + ingresos − gastos − retiros − pagos de TC.</p>
-            <Button className="w-full" onClick={handleSaveAccount}>Crear Cuenta</Button>
+            <Button className="w-full" onClick={handleSaveAccount}>{editingAccountId ? 'Guardar Cambios' : 'Crear Cuenta'}</Button>
           </div>
         </DialogContent>
       </Dialog>
