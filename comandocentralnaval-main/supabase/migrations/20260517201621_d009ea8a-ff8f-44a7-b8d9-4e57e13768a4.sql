@@ -1,1 +1,0 @@
-TRUNCATE TABLE public.savings_movements, public.savings, public.debt_payments, public.debts, public.upcoming_payments, public.credit_card_transactions, public.atm_withdrawals, public.expenses, public.incomes RESTART IDENTITY CASCADE;
