@@ -68,6 +68,7 @@ export interface UpcomingPayment {
   due_date: string;
   category: string;
   is_paid: boolean;
+  account_id: string | null;
   notes: string;
   frequency: 'once' | 'biweekly' | 'monthly';
   recurrence_end: string | null;
