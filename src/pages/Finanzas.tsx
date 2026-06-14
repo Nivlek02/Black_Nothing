@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, TrendingUp, TrendingDown, CreditCard, Landmark, PiggyBank, Plus,
   Trash2, ArrowUpCircle, ArrowDownCircle, Banknote, Receipt, HandCoins, History,
-  Calendar as CalIcon, CheckCircle2, Clock, Wallet, Target, ArrowDown, ArrowUp, ArrowLeft, ArrowRight
+  Calendar as CalIcon, CheckCircle2, Clock, Wallet, Target, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Edit, Send
 } from 'lucide-react';
 import {
   Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement, UpcomingPayment, Savings, SavingsMovement, BankAccount, BankTransfer,
