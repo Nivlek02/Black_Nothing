@@ -143,6 +143,14 @@ export default function FinanzasPage() {
   const [formSavMovAmount, setFormSavMovAmount] = useState('');
   const [formSavMovType, setFormSavMovType] = useState('deposit');
   const [formSavMovNotes, setFormSavMovNotes] = useState('');
+// Bank transfer form
+const [formTransferFromId, setFormTransferFromId] = useState<string>('');
+const [formTransferToId, setFormTransferToId] = useState<string>('');
+const [formTransferAmount, setFormTransferAmount] = useState('');
+const [formTransferDescription, setFormTransferDescription] = useState('');
+
+// Edit upcoming payment
+const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
 
   // Pay upcoming payment dialog (select account to discount)
   const [payAccountDialog, setPayAccountDialog] = useState<UpcomingPayment | null>(null);
