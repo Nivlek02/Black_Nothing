@@ -503,7 +503,54 @@ const resetForm = () => {
       setDeleteTarget(null); loadAll();
     } catch { toast({ title: 'Error al eliminar', variant: 'destructive' }); }
   };
+  // Bank Transfer Handlers
+  const handleSaveBankTransfer = async () => {
+    if (!formTransferFromId || !formTransferToId || !formTransferAmount || Number(formTransferAmount) <= 0) return;
+    if (formTransferFromId === formTransferToId) {
+      toast({ title: 'La cuenta origen y destino deben ser diferentes', variant: 'destructive' });
+      return;
+    }
+    if (!checkSufficient(formTransferFromId, Number(formTransferAmount))) return;
+    try {
+      await addBankTransfer({
+        from_account_id: formTransferFromId,
+        to_account_id: formTransferToId,
+        amount: Number(formTransferAmount),
+        description: formTransferDescription,
+      });
+      toast({ title: 'Transferencia registrada' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al registrar transferencia', variant: 'destructive' }); }
+  };
 
+  // Edit Upcoming Payment Handlers
+  const handleEditUpcomingPayment = (p: UpcomingPayment) => {
+    setFormUpName(p.name);
+    setFormUpAmount(String(p.amount));
+    setFormUpDate(p.due_date);
+    setFormUpCategory(p.category);
+    setFormUpNotes(p.notes);
+    setFormUpFrequency(p.frequency);
+    setFormUpEndDate(p.recurrence_end || '');
+    setEditingPaymentId(p.id);
+    setDialog('upcoming');
+  };
+  const handleUpdateUpcomingPayment = async () => {
+    if (!formUpName || !formUpAmount || !formUpDate || Number(formUpAmount) <= 0 || !editingPaymentId) return;
+    try {
+      await updateUpcomingPayment(editingPaymentId, {
+        name: formUpName,
+        amount: Number(formUpAmount),
+        due_date: formUpDate,
+        category: formUpCategory,
+        notes: formUpNotes,
+        frequency: formUpFrequency as 'once' | 'biweekly' | 'monthly',
+        recurrence_end: formUpFrequency !== 'once' && formUpEndDate ? formUpEndDate : null,
+      });
+      toast({ title: 'Pago programado actualizado' });
+      setDialog(null); loadAll();
+    } catch { toast({ title: 'Error al actualizar pago', variant: 'destructive' }); }
+  };
   const openDebtPayments = async (debtId: string) => {
     setDebtPaymentsDialog(debtId);
     const payments = await getDebtPayments(debtId);
