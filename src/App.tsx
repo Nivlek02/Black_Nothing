@@ -30,7 +30,7 @@ const App = () => {
         <BrowserRouter>
           <DashboardLayout>
             <Routes>
-              <Route path="/" element={<Navigate to="/agenda" replace />} />
+              <Route path="/" element={<Navigate to="/calendario" replace />} />
               <Route path="/agenda" element={<AgendaPage />} />
               <Route path="/calendario" element={<CalendarioPage />} />
               <Route path="/finanzas" element={<FinanzasPage />} />
