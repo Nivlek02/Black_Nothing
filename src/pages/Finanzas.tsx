@@ -571,6 +571,7 @@ const resetForm = () => {
   const quickActions = [
     { label: 'Ingreso', icon: ArrowUpCircle, color: 'text-green-400', action: () => openDialog('income') },
     { label: 'Gasto', icon: ArrowDownCircle, color: 'text-red-400', action: () => openDialog('expense') },
+    { label: 'Transferencia', icon: Send, color: 'text-blue-400', action: () => openDialog('transfer') },
     { label: 'Retiro', icon: Banknote, color: 'text-yellow-400', action: () => openDialog('withdrawal') },
     { label: 'TC', icon: CreditCard, color: 'text-accent', action: () => openDialog('cc', 'purchase') },
     { label: 'Pago TC', icon: Receipt, color: 'text-primary', action: () => openDialog('cc', 'payment') },
