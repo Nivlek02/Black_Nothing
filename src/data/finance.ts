@@ -101,9 +101,18 @@ export interface DebtPayment {
   created_at: string;
 }
 
+export interface BankTransfer {
+  id: string;
+  from_account_id: string;
+  to_account_id: string;
+  amount: number;
+  description: string;
+  created_at: string;
+}
+
 export type FinanceMovement = {
   id: string;
-  type: 'income' | 'expense' | 'withdrawal' | 'cc_purchase' | 'cc_payment' | 'debt_payment';
+  type: 'income' | 'expense' | 'withdrawal' | 'cc_purchase' | 'cc_payment' | 'debt_payment' | 'transfer';
   category: string;
   amount: number;
   method: string;
@@ -161,7 +170,7 @@ export async function deleteBankAccount(id: string) {
 
 /**
  * Computes the current balance for an account:
- * initial_balance + incomes - expenses - withdrawals - cc_payments (all scoped to account)
+ * initial_balance + incomes - expenses - withdrawals - cc_payments - transfers_out + transfers_in
  */
 export function computeAccountBalance(
   account: BankAccount,
@@ -169,12 +178,38 @@ export function computeAccountBalance(
   expenses: Expense[],
   withdrawals: ATMWithdrawal[],
   ccTx: CreditCardTransaction[],
+  transfers?: BankTransfer[],
 ): number {
   const inc = incomes.filter(i => i.account_id === account.id).reduce((s, r) => s + Number(r.amount), 0);
   const exp = expenses.filter(e => e.account_id === account.id).reduce((s, r) => s + Number(r.amount), 0);
   const wd = withdrawals.filter(w => w.account_id === account.id).reduce((s, r) => s + Number(r.amount), 0);
   const cc = ccTx.filter(t => t.transaction_type === 'payment' && t.account_id === account.id).reduce((s, r) => s + Number(r.amount), 0);
-  return Number(account.initial_balance) + inc - exp - wd - cc;
+  
+  let transferNet = 0;
+  if (transfers) {
+    const transferOut = transfers.filter(t => t.from_account_id === account.id).reduce((s, t) => s + Number(t.amount), 0);
+    const transferIn = transfers.filter(t => t.to_account_id === account.id).reduce((s, t) => s + Number(t.amount), 0);
+    transferNet = transferIn - transferOut;
+  }
+  
+  return Number(account.initial_balance) + inc - exp - wd - cc + transferNet;
+}
+
+// ===== Bank Transfers =====
+export async function getBankTransfers() {
+  const { data } = await supabase.from('bank_transfers').select('*').order('created_at', { ascending: false });
+  return (data ?? []) as BankTransfer[];
+}
+
+export async function addBankTransfer(t: Omit<BankTransfer, 'id' | 'created_at'>) {
+  const { data, error } = await supabase.from('bank_transfers').insert(t).select().single();
+  if (error) throw error;
+  return data as BankTransfer;
+}
+
+export async function deleteBankTransfer(id: string) {
+  const { error } = await supabase.from('bank_transfers').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // CRUD Functions
@@ -313,14 +348,15 @@ export async function getTotalExpenses(): Promise<number> {
 
 // Build unified history
 export async function getMovementHistory(): Promise<FinanceMovement[]> {
-  const [incomes, expenses, withdrawals, ccTx] = await Promise.all([
-    getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(),
+  const [incomes, expenses, withdrawals, ccTx, transfers] = await Promise.all([
+    getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getBankTransfers(),
   ]);
   const movements: FinanceMovement[] = [
     ...incomes.map(i => ({ id: i.id, type: 'income' as const, category: i.category, amount: i.amount, method: i.payment_method, description: i.description, created_at: i.created_at })),
     ...expenses.map(e => ({ id: e.id, type: 'expense' as const, category: e.category, amount: e.amount, method: e.payment_method, description: e.description, created_at: e.created_at })),
     ...withdrawals.map(w => ({ id: w.id, type: 'withdrawal' as const, category: 'Retiro', amount: w.amount, method: w.source, description: w.description, created_at: w.created_at })),
     ...ccTx.map(t => ({ id: t.id, type: t.transaction_type === 'purchase' ? 'cc_purchase' as const : 'cc_payment' as const, category: t.category, amount: t.amount, method: 'Tarjeta de crédito', description: t.description, created_at: t.created_at })),
+    ...transfers.map(t => ({ id: t.id, type: 'transfer' as const, category: 'Transferencia', amount: t.amount, method: 'Transferencia bancaria', description: t.description, created_at: t.created_at })),
   ];
   movements.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return movements;
@@ -333,6 +369,7 @@ export const MOVEMENT_TYPE_LABELS: Record<string, string> = {
   cc_purchase: 'Compra TC',
   cc_payment: 'Pago TC',
   debt_payment: 'Abono deuda',
+  transfer: 'Transferencia',
 };
 
 // Upcoming Payments CRUD
