@@ -285,20 +285,22 @@ const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
     return monthlySummary.slice(start, start + MONTHS_PER_PAGE);
   }, [monthlySummary, monthlyPage]);
 
-
-  const resetForm = () => {
-    setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
-    setFormExpenseType('occasional'); setFormCcType('purchase'); setFormCcPayMode('total'); setFormCcPayTarget('');
-    setFormAccountId(accounts[0]?.id ?? '');
-    setFormAccName(''); setFormAccBalance(''); setFormAccType('bank'); setFormAccNotes(''); setEditingAccountId(null); setFormDestAccountId('');
-    setFormDebtName(''); setFormDebtTotal(''); setFormDebtStart(new Date().toISOString().split('T')[0]);
-    setFormDebtDue(''); setFormDebtNotes('');
-    setFormDebtPayAmount(''); setFormDebtPayNotes(''); setFormDebtPayId('');
-    setFormUpName(''); setFormUpAmount(''); setFormUpDate(''); setFormUpCategory('Otro'); setFormUpNotes('');
-    setFormUpFrequency('once'); setFormUpEndDate('');
-    setFormSavName(''); setFormSavTarget(''); setFormSavNotes('');
-    setFormSavMovId(''); setFormSavMovAmount(''); setFormSavMovType('deposit'); setFormSavMovNotes('');
-  };
+const resetForm = () => {
+  setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
+  setFormExpenseType('occasional'); setFormCcType('purchase'); setFormCcPayMode('total'); setFormCcPayTarget('');
+  setFormAccountId(accounts[0]?.id ?? '');
+  setFormAccName(''); setFormAccBalance(''); setFormAccType('bank'); setFormAccNotes(''); setEditingAccountId(null); setFormDestAccountId('');
+  setFormDebtName(''); setFormDebtTotal(''); setFormDebtStart(new Date().toISOString().split('T')[0]);
+  setFormDebtDue(''); setFormDebtNotes('');
+  setFormDebtPayAmount(''); setFormDebtPayNotes(''); setFormDebtPayId('');
+  setFormUpName(''); setFormUpAmount(''); setFormUpDate(''); setFormUpCategory('Otro'); setFormUpNotes('');
+  setFormUpFrequency('once'); setFormUpEndDate('');
+  setFormSavName(''); setFormSavTarget(''); setFormSavNotes('');
+  setFormSavMovId(''); setFormSavMovAmount(''); setFormSavMovType('deposit'); setFormSavMovNotes('');
+  setFormTransferFromId(''); setFormTransferToId(''); setFormTransferAmount(''); setFormTransferDescription('');
+  setEditingPaymentId(null);
+};
+  
   const openDialog = (type: string, ccType?: string, savingsId?: string) => { resetForm(); if (ccType) setFormCcType(ccType); if (savingsId) { setFormSavMovId(savingsId); setFormSavMovType('deposit'); } setDialog(type); };
 
   // Balance computation per account
