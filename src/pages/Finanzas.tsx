@@ -18,7 +18,7 @@ import {
   Calendar as CalIcon, CheckCircle2, Clock, Wallet, Target, ArrowDown, ArrowUp, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import {
-  Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement, UpcomingPayment, Savings, SavingsMovement, BankAccount,
+  Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement, UpcomingPayment, Savings, SavingsMovement, BankAccount, BankTransfer,
   INCOME_CATEGORIES, EXPENSE_CATEGORIES, PAYMENT_METHODS, MOVEMENT_TYPE_LABELS, UPCOMING_PAYMENT_CATEGORIES, PAYMENT_FREQUENCIES,
   getIncomes, addIncome, deleteIncome,
   getExpenses, addExpense, deleteExpense,
@@ -31,9 +31,10 @@ import {
   generateRecurringInstances, getNextQuincena,
   getSavings, addSavings, updateSavings, deleteSavings,
   getSavingsMovements, addSavingsMovement,
-  getBankAccounts, addBankAccount, deleteBankAccount, computeAccountBalance,
+  getBankAccounts, addBankAccount, deleteBankAccount, computeAccountBalance, getBankTransfers, addBankTransfer, deleteBankTransfer,
   getAccountTypeFromNotes, encodeNotesWithType, stripNotesType,
 } from '@/data/finance';
+import {
 
 function fmt(n: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
