@@ -658,7 +658,6 @@ export default function FinanzasPage() {
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><Landmark className="h-4 w-4 text-info" /> Total Dinero en Cuentas</CardTitle></CardHeader>
             <CardContent>
               <p className={`text-2xl sm:text-3xl font-bold font-mono-data ${totalAccountBalance >= 0 ? 'text-info' : 'text-destructive'}`}>{fmt(totalAccountBalance)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Suma de saldos de todas las cuentas bancarias</p>
             </CardContent>
           </Card>
 
