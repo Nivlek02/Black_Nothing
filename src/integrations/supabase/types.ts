@@ -115,6 +115,48 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_transfers: {
+        Row: {
+          id: string
+          from_account_id: string
+          to_account_id: string
+          amount: number
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          from_account_id: string
+          to_account_id: string
+          amount: number
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          from_account_id?: string
+          to_account_id?: string
+          amount?: number
+          description?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transfers_from_account_id_fkey"
+            columns: ["from_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transfers_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_card_transactions: {
         Row: {
           account_id: string | null

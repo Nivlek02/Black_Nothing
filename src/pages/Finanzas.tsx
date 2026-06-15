@@ -31,7 +31,8 @@ import {
   generateRecurringInstances, getNextQuincena,
   getSavings, addSavings, updateSavings, deleteSavings,
   getSavingsMovements, addSavingsMovement,
-  getBankAccounts, addBankAccount, updateBankAccount, deleteBankAccount, computeAccountBalance, getBankTransfers, addBankTransfer, deleteBankTransfer,
+  getBankAccounts, addBankAccount, updateBankAccount, deleteBankAccount, computeAccountBalance,
+  getBankTransfers, addBankTransfer, deleteBankTransfer,
   getAccountTypeFromNotes, encodeNotesWithType, stripNotesType,
 } from '@/data/finance';
 
@@ -80,6 +81,7 @@ export default function FinanzasPage() {
   const [upcomingPayments, setUpcomingPayments] = useState<UpcomingPayment[]>([]);
   const [savings, setSavings] = useState<Savings[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [transfers, setTransfers] = useState<BankTransfer[]>([]);
   const [totalDebtPayments, setTotalDebtPayments] = useState(0);
   const [totalPaidPayments, setTotalPaidPayments] = useState(0);
   const [totalSavingsDeposits, setTotalSavingsDeposits] = useState(0);
@@ -171,10 +173,10 @@ export default function FinanzasPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [i, e, w, c, d, h, up, sv, ba, dpTotal, paidPay, savDep] = await Promise.all([
-        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(), getBankAccounts(), getAllDebtPaymentsTotal(), getTotalPaidUpcomingPayments(), getTotalSavingsDeposits(),
+      const [i, e, w, c, d, h, up, sv, ba, tr, dpTotal, paidPay, savDep] = await Promise.all([
+        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(), getBankAccounts(), getBankTransfers(), getAllDebtPaymentsTotal(), getTotalPaidUpcomingPayments(), getTotalSavingsDeposits(),
       ]);
-      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv); setAccounts(ba); setTotalDebtPayments(dpTotal); setTotalPaidPayments(paidPay); setTotalSavingsDeposits(savDep);
+      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv); setAccounts(ba); setTransfers(tr); setTotalDebtPayments(dpTotal); setTotalPaidPayments(paidPay); setTotalSavingsDeposits(savDep);
     } catch (err) {
       console.error('Error loading finance data:', err);
       toast({ title: 'Error al cargar datos financieros', variant: 'destructive' });
@@ -191,7 +193,7 @@ export default function FinanzasPage() {
   const bankAccounts = useMemo(() => accounts.filter(a => getAccountTypeFromNotes(a.notes) !== 'cash'), [accounts]);
   const cashAccounts = useMemo(() => accounts.filter(a => getAccountTypeFromNotes(a.notes) === 'cash'), [accounts]);
   const totalAccountBalance = useMemo(() =>
-    accounts.reduce((s, a) => s + computeAccountBalance(a, incomes, expenses, withdrawals, ccTx), 0),
+    accounts.reduce((s, a) => s + computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers), 0),
     [accounts, incomes, expenses, withdrawals, ccTx]
   );
 
@@ -305,7 +307,7 @@ export default function FinanzasPage() {
   const getAccountBalance = (accountId: string): number => {
     const acc = accounts.find(a => a.id === accountId);
     if (!acc) return 0;
-    return computeAccountBalance(acc, incomes, expenses, withdrawals, ccTx);
+    return computeAccountBalance(acc, incomes, expenses, withdrawals, ccTx, transfers);
   };
   const checkSufficient = (accountId: string, amount: number): boolean => {
     if (!accountId) return true;
@@ -524,7 +526,10 @@ export default function FinanzasPage() {
       });
       toast({ title: 'Transferencia registrada' });
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al registrar transferencia', variant: 'destructive' }); }
+    } catch (err) {
+      console.error('Error al registrar transferencia:', err);
+      toast({ title: 'Error al registrar la transferencia', description: err instanceof Error ? err.message : 'Ocurrió un error inesperado', variant: 'destructive' });
+    }
   };
   const handleEditUpcomingPayment = (p: UpcomingPayment) => {
     setFormUpName(p.name);
@@ -812,7 +817,7 @@ export default function FinanzasPage() {
           )}
           <div className="grid gap-3 sm:grid-cols-2">
             {accounts.map(a => {
-              const balance = computeAccountBalance(a, incomes, expenses, withdrawals, ccTx);
+              const balance = computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers);
               return (
                 <Card key={a.id} className="card-metallic">
                   <CardContent className="p-4 space-y-2">
@@ -1193,7 +1198,7 @@ export default function FinanzasPage() {
                 <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
               ) : (
                 <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
-                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
                 </Select>
               )}
             </div>
@@ -1229,7 +1234,7 @@ export default function FinanzasPage() {
                 <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
               ) : (
                 <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
-                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
                 </Select>
               )}
             </div>
@@ -1250,7 +1255,7 @@ export default function FinanzasPage() {
                 <p className="text-xs text-warning">No hay cuentas de banco. Crea una en la pestaña Cuentas.</p>
               ) : (
                 <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar banco" /></SelectTrigger>
-                  <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                  <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
                 </Select>
               )}
             </div>
@@ -1259,7 +1264,7 @@ export default function FinanzasPage() {
                 <p className="text-xs text-warning">No hay cuentas de efectivo. Crea una en la pestaña Cuentas.</p>
               ) : (
                 <Select value={formDestAccountId} onValueChange={setFormDestAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar efectivo" /></SelectTrigger>
-                  <SelectContent>{cashAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                  <SelectContent>{cashAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
                 </Select>
               )}
             </div>
@@ -1321,7 +1326,7 @@ export default function FinanzasPage() {
                     <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
                   ) : (
                     <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
-                      <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                      <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
                     </Select>
                   )}
                 </div>
@@ -1433,7 +1438,7 @@ export default function FinanzasPage() {
                 <p className="text-xs text-warning">No hay cuentas de banco. Crea una en la pestaña Cuentas.</p>
               ) : (
                 <Select value={formTransferFromId} onValueChange={setFormTransferFromId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta origen" /></SelectTrigger>
-                  <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                  <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
                 </Select>
               )}
             </div>
@@ -1442,7 +1447,7 @@ export default function FinanzasPage() {
                 <p className="text-xs text-warning">No hay cuentas de banco. Crea una en la pestaña Cuentas.</p>
               ) : (
                 <Select value={formTransferToId} onValueChange={setFormTransferToId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta destino" /></SelectTrigger>
-                  <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                  <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
                 </Select>
               )}
             </div>
@@ -1474,7 +1479,7 @@ export default function FinanzasPage() {
                   <p className="text-xs text-warning">Primero crea una cuenta en la pestaña Cuentas.</p>
                 ) : (
                   <Select value={formPayAccountId} onValueChange={setFormPayAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
-                    <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx))}</SelectItem>)}</SelectContent>
+                    <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
                   </Select>
                 )}
               </div>
