@@ -391,7 +391,7 @@ export async function deleteUpcomingPayment(id: string) {
   if (error) throw error;
 }
 
-export const UPCOMING_PAYMENT_CATEGORIES = ['Servicios', 'Arriendo', 'Suscripción', 'Crédito', 'Seguro', 'Educación', 'Otro'];
+export const UPCOMING_PAYMENT_CATEGORIES = ['Servicios', 'Ahorros', 'Crédito', 'Alimentación', 'Educación', 'Transporte','Otro'];
 
 // Generate recurring payment instances
 export function generateRecurringInstances(payments: UpcomingPayment[]): UpcomingPayment[] {
