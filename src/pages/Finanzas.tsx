@@ -679,7 +679,7 @@ export default function FinanzasPage() {
           </div>
 
           <Card className="card-metallic border-info/30">
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><Landmark className="h-4 w-4 text-info" /> Total Dinero en Cuentas</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground flex items-center gap-2"><Landmark className="h-4 w-4 text-info" /> Total Dinero</CardTitle></CardHeader>
             <CardContent>
               <p className={`text-2xl sm:text-3xl font-bold font-mono-data ${totalAccountBalance >= 0 ? 'text-info' : 'text-destructive'}`}>{fmt(totalAccountBalance)}</p>
             </CardContent>
@@ -838,9 +838,8 @@ export default function FinanzasPage() {
                       </div>
                     </div>
                     <div className="pt-2 border-t border-border" onClick={e => e.stopPropagation()}>
-                      <p className="text-xs text-muted-foreground">Saldo disponible</p>
+                      <p className="text-xs text-muted-foreground">Saldo</p>
                       <p className={`text-2xl font-bold font-mono-data ${balance < 0 ? 'text-destructive' : 'text-primary'}`}>{fmt(balance)}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">Inicial: {fmt(Number(a.initial_balance))}</p>
                     </div>
                   </CardContent>
                 </Card>
