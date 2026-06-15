@@ -291,8 +291,16 @@ export default function FinanzasPage() {
     setFormTransferFromId(''); setFormTransferToId(''); setFormTransferAmount(''); setFormTransferDescription('');
     setEditingPaymentId(null);
   };
-
-  const openDialog = (type: string, ccType?: string, savingsId?: string) => { resetForm(); if (ccType) setFormCcType(ccType); if (savingsId) { setFormSavMovId(savingsId); setFormSavMovType('deposit'); } setDialog(type); };
+  const openDialog = (type: string, ccType?: string, savingsId?: string) => {
+    resetForm();
+    if (ccType) setFormCcType(ccType);
+    if (savingsId) { setFormSavMovId(savingsId); setFormSavMovType('deposit'); }
+    if (type === 'withdrawal') {
+      setFormAccountId(bankAccounts[0]?.id ?? '');
+      setFormDestAccountId(cashAccounts[0]?.id ?? '');
+    }
+    setDialog(type);
+  };
 
   const getAccountBalance = (accountId: string): number => {
     const acc = accounts.find(a => a.id === accountId);
@@ -367,11 +375,20 @@ export default function FinanzasPage() {
     if (accounts.length > 0 && !formDestAccountId) { toast({ title: 'Selecciona la cuenta de efectivo destino', variant: 'destructive' }); return; }
     if (formAccountId === formDestAccountId) { toast({ title: 'La cuenta origen y destino deben ser diferentes', variant: 'destructive' }); return; }
     try {
-      await addWithdrawal({ amount: Number(formAmount), description: formDescription, account_id: formAccountId || null });
+      const sourceAccount = accounts.find(a => a.id === formAccountId);
+      await addWithdrawal({
+        amount: Number(formAmount),
+        source: sourceAccount?.name ?? 'Cuenta principal',
+        description: formDescription,
+        account_id: formAccountId || null,
+      });
       await addIncome({ amount: Number(formAmount), category: 'Transferencia', description: `Retiro desde cuenta: ${formDescription || 'Sin descripción'}`, payment_method: 'Efectivo', account_id: formDestAccountId || null });
-      toast({ title: 'Retiro registrado' });
+      toast({ title: 'Transferencia a efectivo registrada' });
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al registrar retiro', variant: 'destructive' }); }
+    } catch (err) {
+      console.error('Error al registrar transferencia:', err);
+      toast({ title: 'Error al registrar la transferencia', description: err instanceof Error ? err.message : 'Ocurrió un error inesperado', variant: 'destructive' });
+    }
   };
   const handleSaveCCTx = async () => {
     if (formCcType === 'purchase' && (!formAmount || Number(formAmount) <= 0)) return;
