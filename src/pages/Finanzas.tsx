@@ -154,6 +154,8 @@ export default function FinanzasPage() {
   // Pay upcoming payment dialog (select account to discount)
   const [payAccountDialog, setPayAccountDialog] = useState<UpcomingPayment | null>(null);
   const [formPayAccountId, setFormPayAccountId] = useState<string>('');
+  // Account history dialog
+  const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
 
   // History filters
   const [filterType, setFilterType] = useState('all');
@@ -819,7 +821,7 @@ export default function FinanzasPage() {
             {accounts.map(a => {
               const balance = computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers);
               return (
-                <Card key={a.id} className="card-metallic">
+                <Card key={a.id} className="card-metallic cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setSelectedAccount(a)}>
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -830,12 +832,12 @@ export default function FinanzasPage() {
                         </p>
                         {stripNotesType(a.notes) && <p className="text-xs text-muted-foreground mt-1">{stripNotesType(a.notes)}</p>}
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleEditAccount(a)}>Editar</Button>
                         <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'account', id: a.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </div>
-                    <div className="pt-2 border-t border-border">
+                    <div className="pt-2 border-t border-border" onClick={e => e.stopPropagation()}>
                       <p className="text-xs text-muted-foreground">Saldo disponible</p>
                       <p className={`text-2xl font-bold font-mono-data ${balance < 0 ? 'text-destructive' : 'text-primary'}`}>{fmt(balance)}</p>
                       <p className="text-[10px] text-muted-foreground mt-1">Inicial: {fmt(Number(a.initial_balance))}</p>
@@ -981,14 +983,14 @@ export default function FinanzasPage() {
             <CardContent className="p-0">
               <MobileTable>
                 <Table>
-                  <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Categoría</TableHead><TableHead>Método</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Categoría</TableHead><TableHead>Cuenta</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
                   <TableBody>
                     {incomes.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin ingresos registrados</TableCell></TableRow>}
                     {incomes.slice(incomePage * Number(incomePageSize), (incomePage + 1) * Number(incomePageSize)).map(i => (
                       <TableRow key={i.id}>
                         <TableCell className="font-mono-data text-xs">{fmtDate(i.created_at)}</TableCell>
                         <TableCell><Badge variant="secondary">{i.category}</Badge></TableCell>
-                        <TableCell className="text-sm">{i.payment_method}</TableCell>
+                        <TableCell className="text-sm">{accounts.find(a => a.id === i.account_id)?.name ?? '-'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{i.description}</TableCell>
                         <TableCell className="text-right font-mono-data text-green-400">{fmt(Number(i.amount))}</TableCell>
                         <TableCell><Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'income', id: i.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
@@ -1012,7 +1014,7 @@ export default function FinanzasPage() {
             <CardContent className="p-0">
               <MobileTable>
                 <Table>
-                  <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Método</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Categoría</TableHead><TableHead>Cuenta</TableHead><TableHead>Descripción</TableHead><TableHead className="text-right">Monto</TableHead><TableHead></TableHead></TableRow></TableHeader>
                   <TableBody>
                     {expenses.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Sin gastos registrados</TableCell></TableRow>}
                     {expenses.slice(expensePage * Number(expensePageSize), (expensePage + 1) * Number(expensePageSize)).map(e => (
@@ -1020,7 +1022,7 @@ export default function FinanzasPage() {
                         <TableCell className="font-mono-data text-xs">{fmtDate(e.created_at)}</TableCell>
                         <TableCell><Badge variant={e.expense_type === 'fixed' ? 'default' : 'secondary'}>{e.expense_type === 'fixed' ? 'Fijo' : 'Ocasional'}</Badge></TableCell>
                         <TableCell><Badge variant="outline">{e.category}</Badge></TableCell>
-                        <TableCell className="text-sm">{e.payment_method}</TableCell>
+                        <TableCell className="text-sm">{accounts.find(a => a.id === e.account_id)?.name ?? '-'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{e.description}</TableCell>
                         <TableCell className="text-right font-mono-data text-red-400">{fmt(Number(e.amount))}</TableCell>
                         <TableCell><Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'expense', id: e.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
@@ -1176,6 +1178,52 @@ export default function FinanzasPage() {
       </Tabs>
 
       {/* ===== DIALOGS ===== */}
+
+      {/* Account History Dialog */}
+      <Dialog open={!!selectedAccount} onOpenChange={o => !o && setSelectedAccount(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              {selectedAccount && (getAccountTypeFromNotes(selectedAccount.notes) === 'cash' ? <Wallet className="h-4 w-4 text-emerald-400" /> : <Landmark className="h-4 w-4 text-primary" />)}
+              <span>{selectedAccount?.name}</span>
+              <span className="text-base font-mono-data font-bold">
+                {selectedAccount && fmt(computeAccountBalance(selectedAccount, incomes, expenses, withdrawals, ccTx, transfers))}
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 -mx-6 px-6">
+            {(() => {
+              if (!selectedAccount) return null;
+              const accId = selectedAccount.id;
+              const movs: { date: string; type: string; desc: string; amount: number; color: string }[] = [
+                ...incomes.filter(i => i.account_id === accId).map(i => ({ date: i.created_at, type: 'Ingreso', desc: i.description || i.category, amount: Number(i.amount), color: 'text-green-400' })),
+                ...expenses.filter(e => e.account_id === accId).map(e => ({ date: e.created_at, type: 'Gasto', desc: e.description || e.category, amount: -Number(e.amount), color: 'text-red-400' })),
+                ...withdrawals.filter(w => w.account_id === accId).map(w => ({ date: w.created_at, type: 'Retiro', desc: w.description, amount: -Number(w.amount), color: 'text-red-400' })),
+                ...ccTx.filter(t => t.transaction_type === 'payment' && t.account_id === accId).map(t => ({ date: t.created_at, type: 'Pago TC', desc: t.description || t.category, amount: -Number(t.amount), color: 'text-red-400' })),
+                ...transfers.filter(t => t.from_account_id === accId).map(t => ({ date: t.created_at, type: 'Transferencia (Salida)', desc: t.description || 'Sin descripción', amount: -Number(t.amount), color: 'text-red-400' })),
+                ...transfers.filter(t => t.to_account_id === accId).map(t => ({ date: t.created_at, type: 'Transferencia (Entrada)', desc: t.description || 'Sin descripción', amount: Number(t.amount), color: 'text-green-400' })),
+              ];
+              movs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              return movs.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">Sin movimientos registrados en esta cuenta</p>
+              ) : (
+                <div className="space-y-1">
+                  {movs.map((m, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-2 border-b border-border last:border-0 text-sm gap-3">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="font-mono-data text-xs text-muted-foreground shrink-0">{fmtDate(m.date)}</span>
+                        <Badge variant="outline" className="text-[10px] shrink-0">{m.type}</Badge>
+                        <span className="text-muted-foreground truncate">{m.desc}</span>
+                      </div>
+                      <span className={`font-mono-data shrink-0 ${m.color}`}>{m.amount < 0 ? `-${fmt(Math.abs(m.amount))}` : fmt(m.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Income Dialog */}
       <Dialog open={dialog === 'income'} onOpenChange={o => !o && setDialog(null)}>
