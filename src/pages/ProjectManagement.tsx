@@ -68,8 +68,6 @@ const PRIORITY_COLOR: Record<Priority, string> = {
 };
 const KIND_LABEL: Record<Kind, string> = { epic: 'Épica', story: 'Historia', task: 'Tarea', subtask: 'Subtarea' };
 
-const db = supabase as any;
-
 export default function ProjectManagementPage() {
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -81,9 +79,9 @@ export default function ProjectManagementPage() {
   async function loadAll() {
     setLoading(true);
     const [r, t, a] = await Promise.all([
-      db.from('pm_requirements').select('*').order('created_at', { ascending: false }),
-      db.from('pm_tasks').select('*').order('sort_order'),
-      db.from('pm_attachments').select('*').order('created_at', { ascending: false }),
+      supabase.from('pm_requirements').select('*').order('created_at', { ascending: false }),
+      supabase.from('pm_tasks').select('*').order('sort_order'),
+      supabase.from('pm_attachments').select('*').order('created_at', { ascending: false }),
     ]);
     setRequirements(r.data ?? []);
     setTasks(t.data ?? []);
@@ -94,7 +92,7 @@ export default function ProjectManagementPage() {
 
   // Dashboard metrics
   const stats = useMemo(() => {
-    const byStatus: Record<Status, number> = STATUS_LIST.reduce((acc, s) => ({ ...acc, [s]: 0 }), {} as any);
+    const byStatus = STATUS_LIST.reduce<Record<Status, number>>((acc, s) => ({ ...acc, [s]: 0 }), {} as Record<Status, number>);
     requirements.forEach(r => { byStatus[r.status]++; });
     const today = new Date().toISOString().slice(0, 10);
     const overdue = tasks.filter(t => {
@@ -204,23 +202,57 @@ function NewRequirementDialog({ onClose, onCreated }: { onClose: () => void; onC
     description: '', business_goal: '', observations: '',
     complexity: '', risks: '', dependencies: '', impact: '', areas: '',
   });
+  const ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain',
+  ];
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
 
+  function validateFiles(fileList: File[]): boolean {
+    for (const f of fileList) {
+      if (!ALLOWED_MIME_TYPES.includes(f.type) && f.type !== '') {
+        toast.error(`Tipo de archivo no permitido: ${f.type || 'desconocido'}`);
+        return false;
+      }
+      if (f.size > MAX_FILE_SIZE) {
+        toast.error(`Archivo demasiado grande: ${f.name} (máx 10 MB)`);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function sanitizeFileName(name: string): string {
+    // Remove path traversal sequences and special chars
+    return name.replace(/[/\\:<>"|?*]/g, '_').replace(/\.\./g, '_');
+  }
+
   async function submit() {
     if (!form.name.trim()) { toast.error('Nombre requerido'); return; }
+    if (!validateFiles(files)) return;
     setSaving(true);
-    const { data, error } = await db.from('pm_requirements').insert(form).select().single();
-    if (error) { toast.error(error.message); setSaving(false); return; }
+    const { data, error } = await supabase.from('pm_requirements').insert(form).select().single();
+    if (error) { console.error('Error creating requirement:', error); toast.error(error.message); setSaving(false); return; }
 
     for (const f of files) {
-      const path = `${data.id}/${Date.now()}-${f.name}`;
+      const safeName = sanitizeFileName(f.name);
+      const path = `${data.id}/${Date.now()}-${safeName}`;
       const up = await supabase.storage.from('pm-attachments').upload(path, f);
       if (!up.error) {
-        await db.from('pm_attachments').insert({
-          requirement_id: data.id, file_name: f.name, storage_path: path,
+        await supabase.from('pm_attachments').insert({
+          requirement_id: data.id, file_name: safeName, storage_path: path,
           size_bytes: f.size, mime_type: f.type,
         });
+      } else {
+        console.error('Upload error:', up.error);
       }
     }
 
@@ -298,19 +330,19 @@ function RequirementDetail({ requirement, tasks, attachments, onBack, onReload }
     }
     let order = tasks.length;
     for (const epic of data.epics) {
-      const { data: eRow, error: eErr } = await db.from('pm_tasks').insert({
+      const { data: eRow, error: eErr } = await supabase.from('pm_tasks').insert({
         requirement_id: requirement.id, kind: 'epic', title: epic.title,
         description: epic.description ?? null, priority: requirement.priority, sort_order: order++,
       }).select().single();
       if (eErr || !eRow) continue;
       for (const story of epic.stories ?? []) {
-        const { data: sRow } = await db.from('pm_tasks').insert({
+        const { data: sRow } = await supabase.from('pm_tasks').insert({
           requirement_id: requirement.id, parent_id: eRow.id, kind: 'story', title: story.title,
           description: story.description ?? null, priority: requirement.priority, sort_order: order++,
         }).select().single();
         if (!sRow) continue;
         for (const sub of story.subtasks ?? []) {
-          await db.from('pm_tasks').insert({
+          await supabase.from('pm_tasks').insert({
             requirement_id: requirement.id, parent_id: sRow.id, kind: 'subtask', title: sub.title,
             description: sub.description ?? null, priority: requirement.priority, sort_order: order++,
           });
@@ -323,20 +355,20 @@ function RequirementDetail({ requirement, tasks, attachments, onBack, onReload }
   }
 
   async function updateTaskStatus(id: string, status: Status) {
-    await db.from('pm_tasks').update({ status }).eq('id', id);
+    await supabase.from('pm_tasks').update({ status }).eq('id', id);
     onReload();
   }
   async function updateReqStatus(status: Status) {
-    await db.from('pm_requirements').update({ status }).eq('id', requirement.id);
+    await supabase.from('pm_requirements').update({ status }).eq('id', requirement.id);
     onReload();
   }
   async function deleteTask(id: string) {
-    await db.from('pm_tasks').delete().eq('id', id);
+    await supabase.from('pm_tasks').delete().eq('id', id);
     onReload();
   }
   async function deleteRequirement() {
     if (!confirm('¿Eliminar este requerimiento y sus tareas?')) return;
-    await db.from('pm_requirements').delete().eq('id', requirement.id);
+    await supabase.from('pm_requirements').delete().eq('id', requirement.id);
     toast.success('Eliminado');
     onBack();
   }

@@ -1,4 +1,9 @@
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+const APP_ORIGIN = Deno.env.get("APP_ORIGIN") || "http://localhost:8080";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": APP_ORIGIN,
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 interface Subtask { title: string; description?: string }
 interface Story { title: string; description?: string; subtasks?: Subtask[] }

@@ -8,6 +8,17 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// Keep an in-memory cache of the current user ID to avoid repeated auth calls
+let _currentUserId: string | null = null;
+
+export function setCurrentUserId(id: string | null) {
+  _currentUserId = id;
+}
+
+export function getCurrentUserId(): string | null {
+  return _currentUserId;
+}
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
@@ -15,3 +26,60 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+/**
+ * Ensures an anonymous auth session exists.
+ * Call this once on app startup after the user unlocks the app.
+ * Anonymous auth provides proper data isolation via RLS policies.
+ */
+export async function ensureAnonymousSession(): Promise<string | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      setCurrentUserId(session.user.id);
+      return session.user.id;
+    }
+
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) {
+      console.error('Failed to create anonymous session:', error.message);
+      return null;
+    }
+    const uid = data.user?.id ?? null;
+    setCurrentUserId(uid);
+    return uid;
+  } catch (err) {
+    console.error('Auth initialization error:', err);
+    return null;
+  }
+}
+
+/** Get the current user ID, or null if not authenticated */
+export async function getUserId(): Promise<string | null> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) setCurrentUserId(user.id);
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Helper to add user_id filter to any query.
+ * Call this for every SELECT/INSERT/UPDATE/DELETE to ensure data isolation.
+ */
+export function withUserId<T extends Record<string, unknown>>(
+  item: T,
+  userId: string | null
+): T & { user_id?: string } {
+  if (!userId) return item as T & { user_id?: string };
+  return { ...item, user_id: userId };
+}
+
+/**
+ * Creates a filter condition for the current user.
+ */
+export function userFilter(userId: string | null) {
+  return userId ? { user_id: userId } : {};
+}

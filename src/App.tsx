@@ -4,23 +4,35 @@ import PinLock from "./components/PinLock";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import { initializeIfNeeded } from "./data/store";
+import { ensureAnonymousSession } from "./integrations/supabase/client";
 import AgendaPage from "./pages/Agenda";
 import CalendarioPage from "./pages/Calendario";
 import FinanzasPage from "./pages/Finanzas";
 import ProjectManagementPage from "./pages/ProjectManagement";
 import NotFound from "./pages/NotFound";
-import { Navigate } from "react-router-dom";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   const [unlocked, setUnlocked] = useState(false);
-  useEffect(() => { initializeIfNeeded(); }, []);
+  const [authReady, setAuthReady] = useState(false);
 
-  if (!unlocked) return <PinLock onUnlock={() => setUnlocked(true)} />;
+  useEffect(() => {
+    initializeIfNeeded();
+    // Initialize anonymous auth session on mount
+    ensureAnonymousSession().then(() => setAuthReady(true));
+  }, []);
+
+  const handleUnlock = async () => {
+    await ensureAnonymousSession();
+    setUnlocked(true);
+  };
+
+  if (!unlocked) return <PinLock onUnlock={handleUnlock} />;
+  if (!authReady) return null;
 
   return (
     <QueryClientProvider client={queryClient}>

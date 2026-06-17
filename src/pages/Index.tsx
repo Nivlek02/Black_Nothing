@@ -24,9 +24,9 @@ export default function HomePage() {
   const todayStr = fmt(today);
 
   useEffect(() => {
-    getTasksForDate(todayStr).then(setTodayTasks);
-    getTotalIncomes().then(setTotalIncome);
-    getTotalExpenses().then(setTotalExpense);
+    getTasksForDate(todayStr).then(setTodayTasks).catch(err => console.error('Error loading tasks:', err));
+    getTotalIncomes().then(setTotalIncome).catch(err => console.error('Error loading incomes:', err));
+    getTotalExpenses().then(setTotalExpense).catch(err => console.error('Error loading expenses:', err));
   }, [todayStr]);
 
   const pending = todayTasks.filter(t => !t.completed).length;

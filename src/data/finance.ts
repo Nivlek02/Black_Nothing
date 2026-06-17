@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getCurrentUserId } from '@/integrations/supabase/client';
 
 // Types
 export interface BankAccount {
@@ -155,7 +155,7 @@ export async function getBankAccounts() {
   return (data ?? []) as BankAccount[];
 }
 export async function addBankAccount(a: Omit<BankAccount, 'id' | 'created_at'>) {
-  const { data, error } = await supabase.from('bank_accounts').insert(a).select().single();
+  const { data, error } = await supabase.from('bank_accounts').insert({ ...a, user_id: getCurrentUserId() }).select().single();
   if (error) throw error;
   return data as BankAccount;
 }
@@ -202,7 +202,7 @@ export async function getBankTransfers() {
 }
 
 export async function addBankTransfer(t: Omit<BankTransfer, 'id' | 'created_at'>) {
-  const { data, error } = await supabase.from('bank_transfers').insert(t).select().single();
+  const { data, error } = await supabase.from('bank_transfers').insert({ ...t, user_id: getCurrentUserId() }).select().single();
   if (error) throw error;
   return data as BankTransfer;
 }
@@ -218,7 +218,7 @@ export async function getIncomes() {
   return (data ?? []) as Income[];
 }
 export async function addIncome(income: Omit<Income, 'id' | 'created_at'>) {
-  const { data, error } = await supabase.from('incomes').insert(income).select().single();
+  const { data, error } = await supabase.from('incomes').insert({ ...income, user_id: getCurrentUserId() }).select().single();
   if (error) throw error;
   return data as Income;
 }
@@ -232,7 +232,7 @@ export async function getExpenses() {
   return (data ?? []) as Expense[];
 }
 export async function addExpense(expense: Omit<Expense, 'id' | 'created_at'>) {
-  const { data, error } = await supabase.from('expenses').insert(expense).select().single();
+  const { data, error } = await supabase.from('expenses').insert({ ...expense, user_id: getCurrentUserId() }).select().single();
   if (error) throw error;
   return data as Expense;
 }
@@ -246,7 +246,7 @@ export async function getWithdrawals() {
   return (data ?? []) as ATMWithdrawal[];
 }
 export async function addWithdrawal(w: Omit<ATMWithdrawal, 'id' | 'created_at'>) {
-  const { data, error } = await supabase.from('atm_withdrawals').insert(w).select().single();
+  const { data, error } = await supabase.from('atm_withdrawals').insert({ ...w, user_id: getCurrentUserId() }).select().single();
   if (error) throw error;
   return data as ATMWithdrawal;
 }
@@ -260,7 +260,7 @@ export async function getCCTransactions() {
   return (data ?? []) as CreditCardTransaction[];
 }
 export async function addCCTransaction(t: Omit<CreditCardTransaction, 'id' | 'created_at'>) {
-  const { data, error } = await supabase.from('credit_card_transactions').insert(t).select().single();
+  const { data, error } = await supabase.from('credit_card_transactions').insert({ ...t, user_id: getCurrentUserId() }).select().single();
   if (error) throw error;
   return data as CreditCardTransaction;
 }
@@ -274,7 +274,7 @@ export async function getDebts() {
   return (data ?? []) as Debt[];
 }
 export async function addDebt(d: Omit<Debt, 'id' | 'created_at'>) {
-  const { data, error } = await supabase.from('debts').insert(d).select().single();
+  const { data, error } = await supabase.from('debts').insert({ ...d, user_id: getCurrentUserId() }).select().single();
   if (error) throw error;
   return data as Debt;
 }
@@ -296,7 +296,7 @@ export async function getAllDebtPaymentsTotal(): Promise<number> {
   return (data ?? []).reduce((s, r) => s + Number(r.amount), 0);
 }
 export async function addDebtPayment(p: Omit<DebtPayment, 'id' | 'created_at'>) {
-  const { data, error } = await supabase.from('debt_payments').insert(p).select().single();
+  const { data, error } = await supabase.from('debt_payments').insert({ ...p, user_id: getCurrentUserId() }).select().single();
   if (error) throw error;
   const { data: debt, error: fetchErr } = await supabase
     .from('debts')
@@ -378,7 +378,7 @@ export async function getUpcomingPayments() {
   return (data ?? []) as UpcomingPayment[];
 }
 export async function addUpcomingPayment(p: Omit<UpcomingPayment, 'id' | 'created_at'>) {
-  const { data, error } = await supabase.from('upcoming_payments').insert(p).select().single();
+  const { data, error } = await supabase.from('upcoming_payments').insert({ ...p, user_id: getCurrentUserId() }).select().single();
   if (error) throw error;
   return data as UpcomingPayment;
 }
@@ -450,7 +450,7 @@ export async function getSavings() {
   return (data ?? []) as Savings[];
 }
 export async function addSavings(s: Omit<Savings, 'id' | 'created_at'>) {
-  const { data, error } = await supabase.from('savings').insert(s).select().single();
+  const { data, error } = await supabase.from('savings').insert({ ...s, user_id: getCurrentUserId() }).select().single();
   if (error) throw error;
   return data as Savings;
 }
@@ -468,7 +468,7 @@ export async function getSavingsMovements(savingsId: string) {
   return (data ?? []) as SavingsMovement[];
 }
 export async function addSavingsMovement(m: Omit<SavingsMovement, 'id' | 'created_at'>) {
-  const { data, error } = await supabase.from('savings_movements').insert(m).select().single();
+  const { data, error } = await supabase.from('savings_movements').insert({ ...m, user_id: getCurrentUserId() }).select().single();
   if (error) throw error;
   const { data: saving, error: fetchErr } = await supabase.from('savings').select('current_amount').eq('id', m.savings_id).single();
   if (fetchErr) throw fetchErr;

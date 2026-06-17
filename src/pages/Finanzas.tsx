@@ -126,6 +126,7 @@ export default function FinanzasPage() {
   const [formDebtPayAmount, setFormDebtPayAmount] = useState('');
   const [formDebtPayNotes, setFormDebtPayNotes] = useState('');
   const [formDebtPayId, setFormDebtPayId] = useState('');
+  const [formDebtPayAccountId, setFormDebtPayAccountId] = useState<string>('');
   // Upcoming payment form
   const [formUpName, setFormUpName] = useState('');
   const [formUpAmount, setFormUpAmount] = useState('');
@@ -143,6 +144,7 @@ export default function FinanzasPage() {
   const [formSavMovAmount, setFormSavMovAmount] = useState('');
   const [formSavMovType, setFormSavMovType] = useState('deposit');
   const [formSavMovNotes, setFormSavMovNotes] = useState('');
+  const [formSavMovAccountId, setFormSavMovAccountId] = useState<string>('');
   // Bank transfer form
   const [formTransferFromId, setFormTransferFromId] = useState<string>('');
   const [formTransferToId, setFormTransferToId] = useState<string>('');
@@ -287,11 +289,11 @@ export default function FinanzasPage() {
     setFormAccName(''); setFormAccBalance(''); setFormAccType('bank'); setFormAccNotes(''); setEditingAccountId(null); setFormDestAccountId('');
     setFormDebtName(''); setFormDebtTotal(''); setFormDebtStart(new Date().toISOString().split('T')[0]);
     setFormDebtDue(''); setFormDebtNotes('');
-    setFormDebtPayAmount(''); setFormDebtPayNotes(''); setFormDebtPayId('');
+    setFormDebtPayAmount(''); setFormDebtPayNotes(''); setFormDebtPayId(''); setFormDebtPayAccountId('');
     setFormUpName(''); setFormUpAmount(''); setFormUpDate(''); setFormUpCategory('Otro'); setFormUpNotes('');
     setFormUpFrequency('once'); setFormUpEndDate('');
     setFormSavName(''); setFormSavTarget(''); setFormSavNotes('');
-    setFormSavMovId(''); setFormSavMovAmount(''); setFormSavMovType('deposit'); setFormSavMovNotes('');
+    setFormSavMovId(''); setFormSavMovAmount(''); setFormSavMovType('deposit'); setFormSavMovNotes(''); setFormSavMovAccountId('');
     setFormTransferFromId(''); setFormTransferToId(''); setFormTransferAmount(''); setFormTransferDescription('');
     setEditingPaymentId(null);
   };
@@ -302,6 +304,12 @@ export default function FinanzasPage() {
     if (type === 'withdrawal') {
       setFormAccountId(bankAccounts[0]?.id ?? '');
       setFormDestAccountId(cashAccounts[0]?.id ?? '');
+    }
+    if (type === 'debtpayment') {
+      setFormDebtPayAccountId(accounts[0]?.id ?? '');
+    }
+    if (type === 'savingsmovement') {
+      setFormSavMovAccountId(accounts[0]?.id ?? '');
     }
     setDialog(type);
   };
@@ -351,7 +359,7 @@ export default function FinanzasPage() {
         toast({ title: 'Cuenta creada' });
       }
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al guardar cuenta', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al guardar cuenta:', err); toast({ title: 'Error al guardar cuenta', variant: 'destructive' }); }
   };
   const handleSaveIncome = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
@@ -360,7 +368,7 @@ export default function FinanzasPage() {
       await addIncome({ amount: Number(formAmount), category: formCategory || 'Otro', description: formDescription, payment_method: formMethod, account_id: formAccountId || null });
       toast({ title: 'Ingreso registrado' });
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al registrar ingreso', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al registrar ingreso:', err); toast({ title: 'Error al registrar ingreso', variant: 'destructive' }); }
   };
   const handleSaveExpense = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
@@ -370,7 +378,7 @@ export default function FinanzasPage() {
       await addExpense({ amount: Number(formAmount), category: formCategory || 'Otro', expense_type: formExpenseType as 'fixed' | 'occasional', description: formDescription, payment_method: formMethod, account_id: formAccountId || null });
       toast({ title: 'Gasto registrado' });
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al registrar gasto', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al registrar gasto:', err); toast({ title: 'Error al registrar gasto', variant: 'destructive' }); }
   };
   const handleSaveWithdrawal = async () => {
     if (!formAmount || Number(formAmount) <= 0) return;
@@ -417,7 +425,7 @@ export default function FinanzasPage() {
       await addCCTransaction({ amount: finalAmount, transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: desc, account_id: formCcType === 'payment' ? (formAccountId || null) : null });
       toast({ title: formCcType === 'purchase' ? 'Compra TC registrada' : 'Pago TC registrado' });
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al registrar movimiento TC', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al registrar movimiento TC:', err); toast({ title: 'Error al registrar movimiento TC', variant: 'destructive' }); }
   };
   const handleSaveDebt = async () => {
     if (!formDebtName || !formDebtTotal || Number(formDebtTotal) <= 0) return;
@@ -425,15 +433,29 @@ export default function FinanzasPage() {
       await addDebt({ name: formDebtName, total_amount: Number(formDebtTotal), remaining_amount: Number(formDebtTotal), start_date: formDebtStart, due_date: formDebtDue || formDebtStart, status: 'active', notes: formDebtNotes });
       toast({ title: 'Deuda registrada' });
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al registrar deuda', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al registrar deuda:', err); toast({ title: 'Error al registrar deuda', variant: 'destructive' }); }
   };
   const handleSaveDebtPayment = async () => {
     if (!formDebtPayAmount || Number(formDebtPayAmount) <= 0 || !formDebtPayId) return;
+    if (accounts.length > 0 && !formDebtPayAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
+    if (!checkSufficient(formDebtPayAccountId, Number(formDebtPayAmount))) return;
     try {
       await addDebtPayment({ debt_id: formDebtPayId, amount: Number(formDebtPayAmount), notes: formDebtPayNotes });
-      toast({ title: 'Abono registrado' });
+      const debt = debts.find(d => d.id === formDebtPayId);
+      await addExpense({
+        amount: Number(formDebtPayAmount),
+        category: 'Deuda',
+        expense_type: 'occasional',
+        description: `Abono: ${debt?.name || ''}`,
+        payment_method: 'Efectivo',
+        account_id: formDebtPayAccountId || null,
+      });
+      toast({ title: 'Abono registrado y descontado de la cuenta' });
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al registrar abono', variant: 'destructive' }); }
+    } catch (err) {
+      console.error('Error al registrar abono:', err);
+      toast({ title: 'Error al registrar abono', variant: 'destructive' });
+    }
   };
   const handleSaveUpcomingPayment = async () => {
     if (!formUpName || !formUpAmount || !formUpDate || Number(formUpAmount) <= 0) return;
@@ -446,14 +468,14 @@ export default function FinanzasPage() {
       });
       toast({ title: 'Pago programado registrado' });
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al registrar pago', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al registrar pago:', err); toast({ title: 'Error al registrar pago', variant: 'destructive' }); }
   };
   const handleTogglePaid = async (p: UpcomingPayment) => {
     try {
       await updateUpcomingPayment(p.id, { is_paid: !p.is_paid });
       toast({ title: p.is_paid ? 'Marcado como pendiente' : 'Marcado como pagado' });
       loadAll();
-    } catch { toast({ title: 'Error al actualizar', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al actualizar pago:', err); toast({ title: 'Error al actualizar', variant: 'destructive' }); }
   };
   const openPayAccountDialog = (p: UpcomingPayment) => {
     setFormPayAccountId(accounts[0]?.id ?? '');
@@ -478,7 +500,7 @@ export default function FinanzasPage() {
       toast({ title: 'Pago registrado y descontado de la cuenta' });
       setPayAccountDialog(null);
       loadAll();
-    } catch { toast({ title: 'Error al registrar el pago', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al registrar el pago:', err); toast({ title: 'Error al registrar el pago', variant: 'destructive' }); }
   };
   const handleSaveSavings = async () => {
     if (!formSavName) return;
@@ -486,15 +508,39 @@ export default function FinanzasPage() {
       await addSavings({ name: formSavName, target_amount: Number(formSavTarget) || 0, current_amount: 0, notes: formSavNotes });
       toast({ title: 'Ahorro creado' });
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al crear ahorro', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al crear ahorro:', err); toast({ title: 'Error al crear ahorro', variant: 'destructive' }); }
   };
   const handleSaveSavingsMovement = async () => {
     if (!formSavMovId || !formSavMovAmount || Number(formSavMovAmount) <= 0) return;
+    if (accounts.length > 0 && !formSavMovAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
+    if (formSavMovType === 'deposit' && !checkSufficient(formSavMovAccountId, Number(formSavMovAmount))) return;
     try {
       await addSavingsMovement({ savings_id: formSavMovId, amount: Number(formSavMovAmount), movement_type: formSavMovType as 'deposit' | 'withdrawal', notes: formSavMovNotes });
-      toast({ title: formSavMovType === 'deposit' ? 'Depósito registrado' : 'Retiro registrado' });
+      if (formSavMovType === 'deposit') {
+        await addExpense({
+          amount: Number(formSavMovAmount),
+          category: 'Ahorro',
+          expense_type: 'occasional',
+          description: 'Depósito a ahorro',
+          payment_method: 'Efectivo',
+          account_id: formSavMovAccountId || null,
+        });
+      } else {
+        const sav = savings.find(s => s.id === formSavMovId);
+        await addIncome({
+          amount: Number(formSavMovAmount),
+          category: 'Ahorro',
+          description: `Retiro de ahorro: ${sav?.name || ''}`,
+          payment_method: 'Efectivo',
+          account_id: formSavMovAccountId || null,
+        });
+      }
+      toast({ title: formSavMovType === 'deposit' ? 'Depósito registrado y descontado de la cuenta' : 'Retiro registrado y abonado a la cuenta' });
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al registrar movimiento', variant: 'destructive' }); }
+    } catch (err) {
+      console.error('Error al registrar movimiento de ahorro:', err);
+      toast({ title: 'Error al registrar movimiento', variant: 'destructive' });
+    }
   };
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -510,7 +556,7 @@ export default function FinanzasPage() {
       else if (type === 'account') await deleteBankAccount(id);
       toast({ title: 'Eliminado correctamente' });
       setDeleteTarget(null); loadAll();
-    } catch { toast({ title: 'Error al eliminar', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al eliminar:', err); toast({ title: 'Error al eliminar', variant: 'destructive' }); }
   };
   const handleSaveBankTransfer = async () => {
     if (!formTransferFromId || !formTransferToId || !formTransferAmount || Number(formTransferAmount) <= 0) return;
@@ -558,7 +604,7 @@ export default function FinanzasPage() {
       });
       toast({ title: 'Pago programado actualizado' });
       setDialog(null); loadAll();
-    } catch { toast({ title: 'Error al actualizar pago', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al actualizar pago programado:', err); toast({ title: 'Error al actualizar pago', variant: 'destructive' }); }
   };
   const openDebtPayments = async (debtId: string) => {
     setDebtPaymentsDialog(debtId);
@@ -1440,7 +1486,15 @@ export default function FinanzasPage() {
               </Select>
             </div>
             <div><Label>Monto del abono *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formDebtPayAmount)} onChange={e => setFormDebtPayAmount(parseInput(e.target.value))} /></div>
+            {accounts.length > 0 && (
+              <div><Label>¿Desde qué cuenta? *</Label>
+                <Select value={formDebtPayAccountId} onValueChange={setFormDebtPayAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
             <div><Label>Notas</Label><Input value={formDebtPayNotes} onChange={e => setFormDebtPayNotes(e.target.value)} placeholder="Opcional" /></div>
+            <p className="text-xs text-muted-foreground">💡 El abono se descontará del saldo de la cuenta seleccionada.</p>
             <Button className="w-full" onClick={handleSaveDebtPayment}>Guardar Abono</Button>
           </div>
         </DialogContent>
@@ -1569,10 +1623,19 @@ export default function FinanzasPage() {
               </Select>
             </div>
             <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formSavMovAmount)} onChange={e => setFormSavMovAmount(parseInput(e.target.value))} /></div>
-            <div><Label>Notas</Label><Input value={formSavMovNotes} onChange={e => setFormSavMovNotes(e.target.value)} placeholder="Opcional" /></div>
-            {formSavMovType === 'deposit' && (
-              <p className="text-xs text-muted-foreground">💡 Los depósitos se descuentan de tus ingresos como gasto.</p>
+            {accounts.length > 0 && (
+              <div><Label>{formSavMovType === 'deposit' ? '¿Desde qué cuenta?' : '¿A qué cuenta?'} *</Label>
+                <Select value={formSavMovAccountId} onValueChange={setFormSavMovAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                  <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
             )}
+            <div><Label>Notas</Label><Input value={formSavMovNotes} onChange={e => setFormSavMovNotes(e.target.value)} placeholder="Opcional" /></div>
+            <p className="text-xs text-muted-foreground">
+              {formSavMovType === 'deposit'
+                ? '💡 El depósito se descontará del saldo de la cuenta seleccionada.'
+                : '💡 El retiro se abonará al saldo de la cuenta seleccionada.'}
+            </p>
             <Button className="w-full" onClick={handleSaveSavingsMovement}>
               {formSavMovType === 'deposit' ? 'Depositar' : 'Retirar'}
             </Button>

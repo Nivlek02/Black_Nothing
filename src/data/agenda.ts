@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getCurrentUserId } from '@/integrations/supabase/client';
 
 export interface AgendaTask {
   id: string;
@@ -115,6 +115,7 @@ export async function saveAgendaTask(task: AgendaTask): Promise<void> {
       completed: task.completed,
       reminder_minutes: task.reminderMinutes,
       notified: task.notified,
+      user_id: getCurrentUserId(),
     });
   if (error) throw error;
 }
@@ -136,6 +137,7 @@ export async function createAgendaTask(data: Omit<AgendaTask, 'id' | 'createdAt'
       color: data.color,
       completed: false,
       reminder_minutes: data.reminderMinutes,
+      user_id: getCurrentUserId(),
     })
     .select()
     .single();

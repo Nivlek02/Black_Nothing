@@ -1,13 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
 import { buildPushHTTPRequest } from "npm:@pushforge/builder@2.0.3";
 
+const APP_ORIGIN = Deno.env.get("APP_ORIGIN") || "http://localhost:8080";
+
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": APP_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VAPID_PUBLIC_KEY = "BDDcejjFtPB-BrGNlRmOo8SgU5LOmGZQkMz0y0uwb4HwaP8piJWwj3C_QSyM2ef6IKcYCvzQkF-8J4b4FTSoXiU";
-const VAPID_SUBJECT = "mailto:admin@comandocentral.app";
+const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") || "";
+const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@comandocentral.app";
 
 function base64UrlToBytes(value: string): Uint8Array {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);

@@ -163,7 +163,7 @@ export default function AgendaPage() {
       }
       setDialogOpen(false);
       loadTasks();
-    } catch { toast({ title: 'Error al guardar', variant: 'destructive' }); }
+    } catch (err) { console.error('Error saving task:', err); toast({ title: 'Error al guardar', variant: 'destructive' }); }
   };
 
   const handleDelete = async () => {
@@ -173,12 +173,14 @@ export default function AgendaPage() {
       setDeleteId(null);
       toast({ title: 'Tarea eliminada' });
       loadTasks();
-    } catch { toast({ title: 'Error al eliminar tarea', variant: 'destructive' }); }
+    } catch (err) { console.error('Error deleting task:', err); toast({ title: 'Error al eliminar tarea', variant: 'destructive' }); }
   };
 
   const toggleComplete = async (task: AgendaTask) => {
-    await saveAgendaTask({ ...task, completed: !task.completed });
-    loadTasks();
+    try {
+      await saveAgendaTask({ ...task, completed: !task.completed });
+      loadTasks();
+    } catch (err) { console.error('Error toggling task:', err); }
   };
 
   return (

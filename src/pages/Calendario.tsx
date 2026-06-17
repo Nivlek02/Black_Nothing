@@ -103,7 +103,8 @@ export default function CalendarioPage() {
 
   const loadDates = useCallback(async () => {
     const { data, error } = await supabase.from('special_dates').select('*').order('date');
-    if (!error && data) {
+    if (error) { console.error('Error loading dates:', error); return; }
+    if (data) {
       setSpecialDates(data.map(r => ({ id: r.id, date: r.date, name: r.name, color: r.color })));
     }
   }, []);
@@ -156,11 +157,11 @@ export default function CalendarioPage() {
     if (!newName.trim()) return;
     if (editingDate) {
       const { error } = await supabase.from('special_dates').update({ name: newName.trim(), color: newColor }).eq('id', editingDate.id);
-      if (error) { toast({ title: 'Error al actualizar', variant: 'destructive' }); return; }
+      if (error) { console.error('Error updating date:', error); toast({ title: 'Error al actualizar', variant: 'destructive' }); return; }
       toast({ title: 'Fecha actualizada' });
     } else {
       const { error } = await supabase.from('special_dates').insert({ date: selectedDate, name: newName.trim(), color: newColor });
-      if (error) { toast({ title: 'Error al agregar', variant: 'destructive' }); return; }
+      if (error) { console.error('Error inserting date:', error); toast({ title: 'Error al agregar', variant: 'destructive' }); return; }
       toast({ title: 'Fecha especial agregada' });
     }
     setDialogOpen(false);
@@ -169,7 +170,8 @@ export default function CalendarioPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    await supabase.from('special_dates').delete().eq('id', deleteTarget.id);
+    const { error } = await supabase.from('special_dates').delete().eq('id', deleteTarget.id);
+    if (error) { console.error('Error deleting date:', error); toast({ title: 'Error al eliminar', variant: 'destructive' }); return; }
     setDeleteTarget(null);
     toast({ title: 'Fecha eliminada' });
     loadDates();
