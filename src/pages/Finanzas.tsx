@@ -35,6 +35,7 @@ import {
   getBankTransfers, addBankTransfer, deleteBankTransfer,
   getAccountTypeFromNotes, encodeNotesWithType, stripNotesType,
 } from '@/data/finance';
+import { generateAdvices, getDefaultAdvice, type FinanceAdvice } from '@/data/finance-ai';
 
 function fmt(n: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
@@ -175,16 +176,33 @@ export default function FinanzasPage() {
   const [historyPage, setHistoryPage] = useState(0);
   const [historyPageSize, setHistoryPageSize] = useState("10");
 
+  // AI Advice
+  const [advices, setAdvices] = useState<FinanceAdvice[]>([]);
+  const [adviceIndex, setAdviceIndex] = useState(0);
+  const [advicePaused, setAdvicePaused] = useState(false);
+
   const loadAll = useCallback(async () => {
-    try {
-      const [i, e, w, c, d, h, up, sv, ba, tr, dpTotal, paidPay, savDep] = await Promise.all([
-        getIncomes(), getExpenses(), getWithdrawals(), getCCTransactions(), getDebts(), getMovementHistory(), getUpcomingPayments(), getSavings(), getBankAccounts(), getBankTransfers(), getAllDebtPaymentsTotal(), getTotalPaidUpcomingPayments(), getTotalSavingsDeposits(),
-      ]);
-      setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv); setAccounts(ba); setTransfers(tr); setTotalDebtPayments(dpTotal); setTotalPaidPayments(paidPay); setTotalSavingsDeposits(savDep);
-    } catch (err) {
-      console.error('Error loading finance data:', err);
-      toast({ title: 'Error al cargar datos financieros', variant: 'destructive' });
-    }
+    const safeQuery = <T,>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> =>
+      fn().catch((err) => {
+        console.error(`Finanzas: error en "${label}":`, err);
+        return fallback;
+      });
+    const [i, e, w, c, d, h, up, sv, ba, tr, dpTotal, paidPay, savDep] = await Promise.all([
+      safeQuery('incomes', getIncomes, [] as Income[]),
+      safeQuery('expenses', getExpenses, [] as Expense[]),
+      safeQuery('withdrawals', getWithdrawals, [] as ATMWithdrawal[]),
+      safeQuery('ccTx', getCCTransactions, [] as CreditCardTransaction[]),
+      safeQuery('debts', getDebts, [] as Debt[]),
+      safeQuery('movementHistory', getMovementHistory, [] as FinanceMovement[]),
+      safeQuery('upcomingPayments', getUpcomingPayments, [] as UpcomingPayment[]),
+      safeQuery('savings', getSavings, [] as Savings[]),
+      safeQuery('bankAccounts', getBankAccounts, [] as BankAccount[]),
+      safeQuery('bankTransfers', getBankTransfers, [] as BankTransfer[]),
+      safeQuery('totalDebtPayments', getAllDebtPaymentsTotal, 0),
+      safeQuery('totalPaidPayments', getTotalPaidUpcomingPayments, 0),
+      safeQuery('totalSavingsDeposits', getTotalSavingsDeposits, 0),
+    ]);
+    setIncomes(i); setExpenses(e); setWithdrawals(w); setCcTx(c); setDebts(d); setHistory(h); setUpcomingPayments(up); setSavings(sv); setAccounts(ba); setTransfers(tr); setTotalDebtPayments(dpTotal); setTotalPaidPayments(paidPay); setTotalSavingsDeposits(savDep);
   }, [toast]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
@@ -281,6 +299,30 @@ export default function FinanzasPage() {
     const start = monthlyPage * MONTHS_PER_PAGE;
     return monthlySummary.slice(start, start + MONTHS_PER_PAGE);
   }, [monthlySummary, monthlyPage]);
+
+  // AI Advice engine
+  const financeData = useMemo(() => ({
+    accounts, incomes, expenses, withdrawals, ccTx, debts, upcomingPayments, savings, transfers,
+    totalIncome, totalExpense, totalSavings, totalDebts,
+    ccBalance, totalAccountBalance, disponible,
+    monthlySummary,
+  }), [accounts, incomes, expenses, withdrawals, ccTx, debts, upcomingPayments, savings, transfers,
+      totalIncome, totalExpense, totalSavings, totalDebts, ccBalance, totalAccountBalance, disponible, monthlySummary]);
+
+  useEffect(() => {
+    const generated = generateAdvices(financeData);
+    setAdvices(generated);
+    setAdviceIndex(prev => generated.length > 0 && prev >= generated.length ? 0 : prev);
+  }, [financeData]);
+
+  // Auto-rotate advice every 12 seconds
+  useEffect(() => {
+    if (advices.length <= 1 || advicePaused) return;
+    const timer = setInterval(() => {
+      setAdviceIndex(prev => (prev + 1) % advices.length);
+    }, 12000);
+    return () => clearInterval(timer);
+  }, [advices.length, advicePaused]);
 
   const resetForm = () => {
     setFormAmount(''); setFormCategory(''); setFormDescription(''); setFormMethod('Efectivo');
@@ -684,7 +726,7 @@ export default function FinanzasPage() {
       </ScrollArea>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <ScrollArea className="w-full">
+          <ScrollArea className="w-full">
           <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-9 sm:w-full">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Resumen</TabsTrigger>
             <TabsTrigger value="accounts" className="text-xs sm:text-sm">Cuentas</TabsTrigger>
@@ -701,6 +743,66 @@ export default function FinanzasPage() {
 
         {/* OVERVIEW */}
         <TabsContent value="overview" className="space-y-4 mt-4">
+          {/* AI Advice Card */}
+          {advices.length > 0 && (() => {
+            const a = advices[adviceIndex] ?? advices[0];
+            const borderColors = {
+              success: 'border-emerald-500/40',
+              info: 'border-blue-500/40',
+              warning: 'border-yellow-500/40',
+              danger: 'border-red-500/40',
+            };
+            const bgColors = {
+              success: 'bg-emerald-500/5',
+              info: 'bg-blue-500/5',
+              warning: 'bg-yellow-500/5',
+              danger: 'bg-red-500/5',
+            };
+            const dotColors = {
+              success: 'bg-emerald-500',
+              info: 'bg-blue-500',
+              warning: 'bg-yellow-500',
+              danger: 'bg-red-500',
+            };
+            return (
+              <Card className={`card-metallic ${borderColors[a?.type ?? 'info']} ${bgColors[a?.type ?? 'info']}`}
+                onMouseEnter={() => setAdvicePaused(true)}
+                onMouseLeave={() => setAdvicePaused(false)}
+              >
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground mb-1">{a?.title}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                        {a?.message?.split(/(\*\*[^*]+\*\*)/).map((part, i) =>
+                          part.startsWith('**') && part.endsWith('**')
+                            ? <strong key={i} className="text-foreground font-semibold">{part.slice(2, -2)}</strong>
+                            : part
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  {/* Navigation dots */}
+                  {advices.length > 1 && (
+                    <div className="flex items-center justify-center gap-1.5 mt-3">
+                      {advices.map((_, i) => (
+                        <button
+                          key={i}
+                          className={`h-2 w-2 rounded-full transition-all cursor-pointer ${
+                            i === adviceIndex
+                              ? `${dotColors[a?.type ?? 'info']} scale-125`
+                              : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                          }`}
+                          onClick={() => setAdviceIndex(i)}
+                          aria-label={`Consejo ${i + 1}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             <Card className="card-metallic">
               <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6"><CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-2"><TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" /> Ingresos</CardTitle></CardHeader>
