@@ -8,7 +8,7 @@
  *   - Las funciones "load" reconstruyen el WheelState desde las tablas
  */
 
-import { supabase, getCurrentUserId, withUserId } from '@/integrations/supabase/client';
+import { supabase, getCurrentUserId, setCurrentUserId, withUserId } from '@/integrations/supabase/client';
 import {
   DEFAULT_AREAS,
   clampScore,
@@ -25,8 +25,21 @@ import {
 /* =========================================================================
  * Helper: user_id
  * ========================================================================= */
-function withCurrentUserId<T extends Record<string, unknown>>(item: T): T & { user_id?: string } {
-  return withUserId(item, getCurrentUserId());
+/** Asegura que tengamos el user_id, consultando la sesión si es necesario */
+async function ensureUserId(): Promise<string | null> {
+  let uid = getCurrentUserId();
+  if (uid) return uid;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    uid = session?.user?.id ?? null;
+    if (uid) setCurrentUserId(uid);
+  } catch {}
+  return uid;
+}
+
+async function withCurrentUserId<T extends Record<string, unknown>>(item: T): Promise<T & { user_id?: string }> {
+  const userId = await ensureUserId();
+  return withUserId(item, userId);
 }
 
 /* =========================================================================
@@ -221,7 +234,7 @@ export async function saveRating(
   const id = uid();
 
   const { error } = await supabase.from('life_ratings').insert(
-    withCurrentUserId({
+    await withCurrentUserId({
       id,
       area_id: areaId,
       score,
@@ -251,7 +264,7 @@ export async function createGoal(
   const id = uid();
 
   const { error } = await supabase.from('life_goals').insert(
-    withCurrentUserId({
+    await withCurrentUserId({
       id,
       area_id: areaId,
       title,
@@ -271,7 +284,7 @@ export async function addSubtask(goalId: string, title: string): Promise<string>
   const id = uid();
 
   const { error } = await supabase.from('life_subtasks').insert(
-    withCurrentUserId({
+    await withCurrentUserId({
       id,
       goal_id: goalId,
       title,
@@ -315,7 +328,7 @@ export async function completeGoalAndRating(
   // 2. Crear rating automático
   const newScore = clampScore(currentScore + impact);
   const { error: ratingErr } = await supabase.from('life_ratings').insert(
-    withCurrentUserId({
+    await withCurrentUserId({
       id: uid(),
       area_id: areaId,
       score: newScore,
@@ -352,7 +365,7 @@ export async function createHabit(
   const id = uid();
 
   const { error } = await supabase.from('life_habits').insert(
-    withCurrentUserId({
+    await withCurrentUserId({
       id,
       area_id: areaId,
       title,
@@ -389,7 +402,7 @@ export async function logHabitDb(
     if (error) throw error;
   } else {
     const { error } = await supabase.from('life_habit_logs').insert(
-      withCurrentUserId({
+      await withCurrentUserId({
         id: uid(),
         habit_id: habitId,
         date,
