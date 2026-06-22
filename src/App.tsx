@@ -11,6 +11,8 @@ import { ensureAnonymousSession } from "./integrations/supabase/client";
 import AgendaPage from "./pages/Agenda";
 import CalendarioPage from "./pages/Calendario";
 import FinanzasPage from "./pages/Finanzas";
+import HabitosPage from "./pages/Habitos";
+import LifeWheelPage from "./pages/LifeWheelPage";
 import ProjectManagementPage from "./pages/ProjectManagement";
 import NotFound from "./pages/NotFound";
 
@@ -46,6 +48,8 @@ const App = () => {
               <Route path="/agenda" element={<AgendaPage />} />
               <Route path="/calendario" element={<CalendarioPage />} />
               <Route path="/finanzas" element={<FinanzasPage />} />
+              <Route path="/rueda" element={<LifeWheelPage />} />
+              <Route path="/habitos" element={<HabitosPage />} />
               <Route path="/pm" element={<ProjectManagementPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

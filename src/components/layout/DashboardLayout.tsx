@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Anchor, CalendarDays, Calendar, Wallet, Menu, X, Kanban } from 'lucide-react';
+import { Anchor, CalendarDays, Calendar, Wallet, Menu, X, Kanban, BrainCircuit, Flame } from 'lucide-react';
 
 const navItems = [
   { label: 'Calendario', path: '/calendario', icon: Calendar },
   { label: 'Finanzas', path: '/finanzas', icon: Wallet },
+  { label: 'Rueda de Vida', path: '/rueda', icon: BrainCircuit },
+  { label: 'Hábitos', path: '/habitos', icon: Flame },
   { label: 'Agenda', path: '/agenda', icon: CalendarDays },
   { label: 'Project Management', path: '/pm', icon: Kanban },
 ];
