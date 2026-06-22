@@ -994,7 +994,7 @@ export default function FinanzasPage() {
                       type="date"
                       value={chartFromDate}
                       onChange={e => setChartFromDate(e.target.value)}
-                      className="h-7 w-[130px] text-xs"
+                      className="h-7 w-[135px] text-xs [color-scheme:dark]"
                     />
                   </div>
                   <div className="flex items-center gap-1">
@@ -1003,7 +1003,7 @@ export default function FinanzasPage() {
                       type="date"
                       value={chartToDate}
                       onChange={e => setChartToDate(e.target.value)}
-                      className="h-7 w-[130px] text-xs"
+                      className="h-7 w-[135px] text-xs [color-scheme:dark]"
                     />
                   </div>
                   {(chartFromDate || chartToDate) && (
@@ -1027,7 +1027,7 @@ export default function FinanzasPage() {
               ) : (
                 <div className="w-full h-[280px] sm:h-[350px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={expenseCategoryData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
+                    <BarChart data={expenseCategoryData} margin={{ top: 8, right: 8, left: 8, bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis
                         dataKey="name"
@@ -1039,10 +1039,15 @@ export default function FinanzasPage() {
                         height={60}
                       />
                       <YAxis
-                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                         axisLine={{ stroke: 'hsl(var(--border))' }}
                         tickLine={false}
-                        tickFormatter={(v: number) => fmt(v)}
+                        width={70}
+                        tickFormatter={(v: number) => {
+                          if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+                          if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
+                          return `$${v}`;
+                        }}
                       />
                       <Tooltip
                         contentStyle={{
