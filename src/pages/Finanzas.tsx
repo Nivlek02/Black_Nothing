@@ -18,6 +18,9 @@ import {
   Calendar as CalIcon, CheckCircle2, Clock, Wallet, Target, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Edit, Send
 } from 'lucide-react';
 import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
+} from 'recharts';
+import {
   Income, Expense, ATMWithdrawal, CreditCardTransaction, Debt, DebtPayment, FinanceMovement, UpcomingPayment, Savings, SavingsMovement, BankAccount, BankTransfer,
   INCOME_CATEGORIES, EXPENSE_CATEGORIES, PAYMENT_METHODS, MOVEMENT_TYPE_LABELS, UPCOMING_PAYMENT_CATEGORIES, PAYMENT_FREQUENCIES,
   getIncomes, addIncome, deleteIncome,
@@ -163,9 +166,10 @@ export default function FinanzasPage() {
   // History filters
   const [filterType, setFilterType] = useState('all');
 
-  // Pagination states
-  const [monthlyPage, setMonthlyPage] = useState(0);
-  const MONTHS_PER_PAGE = 5;
+  // Chart date filters (empty = no filter)
+  const [chartFromDate, setChartFromDate] = useState('');
+  const [chartToDate, setChartToDate] = useState('');
+  // Pending month pagination
   const [pendingMonthIdx, setPendingMonthIdx] = useState(0);
 
   // Pagination for tables
@@ -294,11 +298,23 @@ export default function FinanzasPage() {
       }));
   }, [incomes, expenses, ccTx, allPaymentInstances]);
 
-  const monthlyTotalPages = Math.ceil(monthlySummary.length / MONTHS_PER_PAGE) || 1;
-  const paginatedMonthly = useMemo(() => {
-    const start = monthlyPage * MONTHS_PER_PAGE;
-    return monthlySummary.slice(start, start + MONTHS_PER_PAGE);
-  }, [monthlySummary, monthlyPage]);
+  const CATEGORY_COLORS = ['#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#f97316', '#14b8a6', '#6366f1', '#e11d48', '#84cc16', '#0ea5e9'];
+
+  const expenseCategoryData = useMemo(() => {
+    const byCat: Record<string, number> = {};
+    const from = chartFromDate ? new Date(chartFromDate + 'T00:00:00') : null;
+    const to = chartToDate ? new Date(chartToDate + 'T23:59:59') : null;
+    expenses.forEach(e => {
+      const d = new Date(e.created_at);
+      if (from && d < from) return;
+      if (to && d > to) return;
+      const cat = e.category || 'Otro';
+      byCat[cat] = (byCat[cat] || 0) + Number(e.amount);
+    });
+    return Object.entries(byCat)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total);
+  }, [expenses, chartFromDate, chartToDate]);
 
   // AI Advice engine
   const financeData = useMemo(() => ({
@@ -911,49 +927,107 @@ export default function FinanzasPage() {
             </Card>
           )}
 
-          {/* Monthly Summary */}
-          {monthlySummary.length > 0 && (
-            <Card className="card-metallic">
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          {/* Expenses by Category Chart */}
+          <Card className="card-metallic">
+            <CardHeader className="pb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                  <CalIcon className="h-4 w-4 text-primary" /> Resumen Mensual
+                  <CalIcon className="h-4 w-4 text-primary" /> Gastos por Categoría
                 </CardTitle>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={monthlyPage <= 0} onClick={() => setMonthlyPage(p => Math.max(0, p - 1))}>‹</Button>
-                  <span className="text-[10px] text-muted-foreground min-w-[3rem] text-center">{monthlyPage + 1}/{monthlyTotalPages}</span>
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={monthlyPage >= monthlyTotalPages - 1} onClick={() => setMonthlyPage(p => Math.min(monthlyTotalPages - 1, p + 1))}>›</Button>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <Label className="text-[10px] text-muted-foreground">Desde</Label>
+                    <Input
+                      type="date"
+                      value={chartFromDate}
+                      onChange={e => setChartFromDate(e.target.value)}
+                      className="h-7 w-[130px] text-xs"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Label className="text-[10px] text-muted-foreground">Hasta</Label>
+                    <Input
+                      type="date"
+                      value={chartToDate}
+                      onChange={e => setChartToDate(e.target.value)}
+                      className="h-7 w-[130px] text-xs"
+                    />
+                  </div>
+                  {(chartFromDate || chartToDate) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => { setChartFromDate(''); setChartToDate(''); }}
+                    >
+                      Limpiar
+                    </Button>
+                  )}
                 </div>
-              </CardHeader>
-              <CardContent>
-                <MobileTable>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Mes</TableHead>
-                        <TableHead className="text-xs text-right">Ingresos</TableHead>
-                        <TableHead className="text-xs text-right">Gastos</TableHead>
-                        <TableHead className="text-xs text-right">Programados</TableHead>
-                        <TableHead className="text-xs text-right">Balance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedMonthly.map(m => (
-                        <TableRow key={m.key}>
-                          <TableCell className="text-xs capitalize">{m.label}</TableCell>
-                          <TableCell className="text-xs text-right font-mono-data text-green-400">{fmt(m.income)}</TableCell>
-                          <TableCell className="text-xs text-right font-mono-data text-red-400">{fmt(m.expense)}</TableCell>
-                          <TableCell className="text-xs text-right font-mono-data text-warning">{fmt(m.scheduled)}</TableCell>
-                          <TableCell className={`text-xs text-right font-mono-data ${m.income - m.expense - m.scheduled >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                            {fmt(m.income - m.expense - m.scheduled)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </MobileTable>
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {expenseCategoryData.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground text-sm">
+                  No hay gastos en el período seleccionado
+                </div>
+              ) : (
+                <div className="w-full h-[280px] sm:h-[350px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={expenseCategoryData} margin={{ top: 8, right: 8, left: -16, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        axisLine={{ stroke: 'hsl(var(--border))' }}
+                        tickLine={false}
+                        angle={-20}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        axisLine={{ stroke: 'hsl(var(--border))' }}
+                        tickLine={false}
+                        tickFormatter={(v: number) => fmt(v)}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: 8,
+                          fontSize: 12,
+                        }}
+                        formatter={(value: number) => [fmt(value), 'Total']}
+                        labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
+                      />
+                      <Legend
+                        wrapperStyle={{ fontSize: 11, color: 'hsl(var(--muted-foreground))' }}
+                        formatter={(value) => <span style={{ color: 'hsl(var(--muted-foreground))' }}>{value}</span>}
+                      />
+                      <Bar dataKey="total" name="Gastos" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                        {expenseCategoryData.map((entry, idx) => (
+                          <Cell key={idx} fill={entry.color || CATEGORY_COLORS[idx % CATEGORY_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {/* Legend as tags for easy reading */}
+              {expenseCategoryData.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-border">
+                  {expenseCategoryData.map(e => (
+                    <span key={e.name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-muted-foreground bg-muted/50">
+                      <span className="h-2 w-2 rounded-full inline-block" style={{ backgroundColor: e.color || CATEGORY_COLORS[0] }} />
+                      {e.name}
+                      <span className="font-mono-data text-foreground">{fmt(e.total)}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ACCOUNTS */}
