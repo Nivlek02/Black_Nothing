@@ -171,6 +171,9 @@ export default function FinanzasPage() {
   const [chartToDate, setChartToDate] = useState('');
   // Pending month pagination
   const [pendingMonthIdx, setPendingMonthIdx] = useState(0);
+  // Monthly summary pagination
+  const [monthlyPage, setMonthlyPage] = useState(0);
+  const MONTHS_PER_PAGE = 5;
 
   // Pagination for tables
   const [incomePage, setIncomePage] = useState(0);
@@ -297,6 +300,12 @@ export default function FinanzasPage() {
         ...data,
       }));
   }, [incomes, expenses, ccTx, allPaymentInstances]);
+
+  const monthlyTotalPages = Math.ceil(monthlySummary.length / MONTHS_PER_PAGE) || 1;
+  const paginatedMonthly = useMemo(() => {
+    const start = monthlyPage * MONTHS_PER_PAGE;
+    return monthlySummary.slice(start, start + MONTHS_PER_PAGE);
+  }, [monthlySummary, monthlyPage]);
 
   const CATEGORY_COLORS = ['#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#f97316', '#14b8a6', '#6366f1', '#e11d48', '#84cc16', '#0ea5e9'];
 
@@ -923,6 +932,50 @@ export default function FinanzasPage() {
                   <span className="text-xs text-muted-foreground">{currentPendingMonth?.payments.length} pago(s)</span>
                   <span className="font-mono-data text-sm font-bold text-warning">{fmt(currentPendingMonth?.total ?? 0)}</span>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Monthly Summary */}
+          {monthlySummary.length > 0 && (
+            <Card className="card-metallic">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <CalIcon className="h-4 w-4 text-primary" /> Resumen Mensual
+                </CardTitle>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={monthlyPage <= 0} onClick={() => setMonthlyPage(p => Math.max(0, p - 1))}>‹</Button>
+                  <span className="text-[10px] text-muted-foreground min-w-[3rem] text-center">{monthlyPage + 1}/{monthlyTotalPages}</span>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={monthlyPage >= monthlyTotalPages - 1} onClick={() => setMonthlyPage(p => Math.min(monthlyTotalPages - 1, p + 1))}>›</Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <MobileTable>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Mes</TableHead>
+                        <TableHead className="text-xs text-right">Ingresos</TableHead>
+                        <TableHead className="text-xs text-right">Gastos</TableHead>
+                        <TableHead className="text-xs text-right">Programados</TableHead>
+                        <TableHead className="text-xs text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedMonthly.map(m => (
+                        <TableRow key={m.key}>
+                          <TableCell className="text-xs capitalize">{m.label}</TableCell>
+                          <TableCell className="text-xs text-right font-mono-data text-green-400">{fmt(m.income)}</TableCell>
+                          <TableCell className="text-xs text-right font-mono-data text-red-400">{fmt(m.expense)}</TableCell>
+                          <TableCell className="text-xs text-right font-mono-data text-warning">{fmt(m.scheduled)}</TableCell>
+                          <TableCell className={`text-xs text-right font-mono-data ${m.income - m.expense - m.scheduled >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                            {fmt(m.income - m.expense - m.scheduled)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </MobileTable>
               </CardContent>
             </Card>
           )}
