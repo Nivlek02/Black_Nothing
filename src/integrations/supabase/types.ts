@@ -500,6 +500,244 @@ export type Database = {
           },
         ]
       }
+      life_areas: {
+        Row: {
+          id: string
+          name: string
+          color: string
+          weight: number
+          order: number
+          user_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          name: string
+          color?: string
+          weight?: number
+          order?: number
+          user_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          color?: string
+          weight?: number
+          order?: number
+          user_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      life_ratings: {
+        Row: {
+          id: string
+          area_id: string
+          score: number
+          date: string
+          source: string
+          note: string | null
+          user_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          area_id: string
+          score: number
+          date?: string
+          source?: string
+          note?: string | null
+          user_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          area_id?: string
+          score?: number
+          date?: string
+          source?: string
+          note?: string | null
+          user_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "life_ratings_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "life_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      life_goals: {
+        Row: {
+          id: string
+          area_id: string
+          title: string
+          status: string
+          impact: number
+          target_date: string | null
+          created_at: string
+          completed_at: string | null
+          user_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          area_id: string
+          title: string
+          status?: string
+          impact?: number
+          target_date?: string | null
+          created_at?: string
+          completed_at?: string | null
+          user_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          area_id?: string
+          title?: string
+          status?: string
+          impact?: number
+          target_date?: string | null
+          created_at?: string
+          completed_at?: string | null
+          user_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "life_goals_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "life_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      life_subtasks: {
+        Row: {
+          id: string
+          goal_id: string
+          title: string
+          done: boolean
+          created_at: string
+          user_id: string | null
+        }
+        Insert: {
+          id: string
+          goal_id: string
+          title: string
+          done?: boolean
+          created_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          goal_id?: string
+          title?: string
+          done?: boolean
+          created_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "life_subtasks_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "life_goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      life_habits: {
+        Row: {
+          id: string
+          area_id: string
+          title: string
+          cadence: string
+          target_per_week: number | null
+          positive: boolean
+          created_at: string
+          archived: boolean
+          user_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          area_id: string
+          title: string
+          cadence?: string
+          target_per_week?: number | null
+          positive?: boolean
+          created_at?: string
+          archived?: boolean
+          user_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          area_id?: string
+          title?: string
+          cadence?: string
+          target_per_week?: number | null
+          positive?: boolean
+          created_at?: string
+          archived?: boolean
+          user_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "life_habits_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "life_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      life_habit_logs: {
+        Row: {
+          id: string
+          habit_id: string
+          date: string
+          done: boolean
+          created_at: string
+          user_id: string | null
+        }
+        Insert: {
+          id: string
+          habit_id: string
+          date: string
+          done?: boolean
+          created_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          habit_id?: string
+          date?: string
+          done?: boolean
+          created_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "life_habit_logs_habit_id_fkey"
+            columns: ["habit_id"]
+            isOneToOne: false
+            referencedRelation: "life_habits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_subscriptions: {
         Row: {
           created_at: string
