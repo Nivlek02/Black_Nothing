@@ -1,4 +1,4 @@
-import { supabase, getCurrentUserId } from '@/integrations/supabase/client';
+import { supabase, withUserId, getCurrentUserId } from '@/integrations/supabase/client';
 
 export interface AgendaTask {
   id: string;
@@ -104,7 +104,7 @@ export async function getOverdueTasks(beforeDate: string): Promise<AgendaTask[]>
 export async function saveAgendaTask(task: AgendaTask): Promise<void> {
   const { error } = await supabase
     .from('agenda_tasks')
-    .upsert({
+    .upsert(withUserId({
       id: task.id,
       title: task.title,
       description: task.description,
@@ -115,8 +115,7 @@ export async function saveAgendaTask(task: AgendaTask): Promise<void> {
       completed: task.completed,
       reminder_minutes: task.reminderMinutes,
       notified: task.notified,
-      user_id: getCurrentUserId(),
-    });
+    }, getCurrentUserId()));
   if (error) throw error;
 }
 
@@ -128,7 +127,7 @@ export async function deleteAgendaTask(id: string): Promise<void> {
 export async function createAgendaTask(data: Omit<AgendaTask, 'id' | 'createdAt' | 'completed' | 'notified'>): Promise<AgendaTask> {
   const { data: rows, error } = await supabase
     .from('agenda_tasks')
-    .insert({
+    .insert(withUserId({
       title: data.title,
       description: data.description,
       date: data.date,
@@ -137,8 +136,7 @@ export async function createAgendaTask(data: Omit<AgendaTask, 'id' | 'createdAt'
       color: data.color,
       completed: false,
       reminder_minutes: data.reminderMinutes,
-      user_id: getCurrentUserId(),
-    })
+    }, getCurrentUserId()))
     .select()
     .single();
   if (error) throw error;
