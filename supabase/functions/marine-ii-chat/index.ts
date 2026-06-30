@@ -1,11 +1,11 @@
-const APP_ORIGIN = Deno.env.get("APP_ORIGIN") || "http://localhost:8080";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": APP_ORIGIN,
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
 Deno.serve(async (req) => {
+  const APP_ORIGIN = Deno.env.get("APP_ORIGIN") || req.headers.get("origin") || "http://localhost:8080";
+
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": APP_ORIGIN,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
@@ -49,6 +49,7 @@ Tu rol:
 
 ${financialSummary}`;
 
+    console.log("Enviando a Groq...");
     const aiRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -59,7 +60,7 @@ ${financialSummary}`;
         model: "llama-3.3-70b-versatile",
         messages: [
           { role: "system", content: systemPrompt },
-          ...messages.map((m: any) => ({ role: m.role, content: m.content })),
+          ...messages.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
         ],
         temperature: 0.7,
         max_tokens: 1024,
@@ -68,6 +69,7 @@ ${financialSummary}`;
 
     if (!aiRes.ok) {
       const txt = await aiRes.text();
+      console.error("Groq error:", aiRes.status, txt);
       return new Response(JSON.stringify({ error: "Error al consultar Groq", detail: txt }), {
         status: aiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -80,8 +82,9 @@ ${financialSummary}`;
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
+    console.error("Error en marine-ii-chat:", e);
     return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { "Access-Control-Allow-Origin": APP_ORIGIN, "Content-Type": "application/json" },
     });
   }
 });
