@@ -16,9 +16,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const key = Deno.env.get('LOVABLE_API_KEY');
-    if (!key) {
-      return new Response(JSON.stringify({ error: 'LOVABLE_API_KEY missing' }), {
+    const apiKey = Deno.env.get('GEMINI_API_KEY');
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'GEMINI_API_KEY no configurada en Supabase. Agrégala en Edge Functions > marine-ii-chat > Environment variables.' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -49,27 +49,40 @@ Tu rol:
 
 ${financialSummary}`;
 
-    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages.map((m: any) => ({ role: m.role, content: m.content })),
-        ],
-      }),
-    });
+    // Convertir mensajes al formato de Gemini
+    const contents: { role: string; parts: { text: string }[] }[] = [];
+    for (const m of messages) {
+      contents.push({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      });
+    }
+
+    const aiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents,
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024,
+          },
+        }),
+      }
+    );
 
     if (!aiRes.ok) {
       const txt = await aiRes.text();
-      return new Response(JSON.stringify({ error: 'AI gateway error', detail: txt }), {
+      return new Response(JSON.stringify({ error: 'Error al consultar Gemini', detail: txt }), {
         status: aiRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const data = await aiRes.json();
-    const reply = data.choices?.[0]?.message?.content ?? '';
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
     return new Response(JSON.stringify({ reply }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
