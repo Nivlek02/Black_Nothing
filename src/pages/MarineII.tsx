@@ -102,7 +102,6 @@ export default function MarineIIPage() {
     setLoading(true);
 
     try {
-      const { error: sessionErr } = await import('@/integrations/supabase/client').then(m => m.ensureAnonymousSession());
       const supabase = (await import('@/integrations/supabase/client')).supabase;
 
       const { data, error } = await supabase.functions.invoke('marine-ii-chat', {
