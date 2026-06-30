@@ -58,10 +58,12 @@ export const supabase = new Proxy({} as SupabaseClient<Database>, {
  */
 export async function ensureAnonymousSession(): Promise<string | null> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      setCurrentUserId(session.user.id);
-      return session.user.id;
+    // Use getUser() which validates the JWT with the server.
+    // getSession() only reads from cache and doesn't detect expired tokens.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setCurrentUserId(user.id);
+      return user.id;
     }
 
     const { data, error } = await supabase.auth.signInAnonymously();

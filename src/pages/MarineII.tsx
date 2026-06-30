@@ -18,6 +18,14 @@ interface FinanceContext {
   ccBalance: number;
   totalAccountBalance: number;
   disponible: number;
+  // Raw data for AI access
+  incomes: any[];
+  expenses: any[];
+  savings: any[];
+  debts: any[];
+  ccTransactions: any[];
+  bankAccounts: any[];
+  upcomingPayments: any[];
 }
 
 export default function MarineIIPage() {
@@ -76,6 +84,13 @@ export default function MarineIIPage() {
         ccBalance,
         totalAccountBalance,
         disponible,
+        incomes,
+        expenses,
+        savings,
+        debts,
+        ccTransactions: ccTx,
+        bankAccounts: accounts,
+        upcomingPayments: allInstances,
       });
     } catch (err) {
       console.error('Error loading finance context:', err);

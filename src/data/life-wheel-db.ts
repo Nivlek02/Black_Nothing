@@ -30,8 +30,9 @@ async function ensureUserId(): Promise<string | null> {
   let uid = getCurrentUserId();
   if (uid) return uid;
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    uid = session?.user?.id ?? null;
+    // getUser() valida el JWT con el servidor, detecta tokens expirados
+    const { data: { user } } = await supabase.auth.getUser();
+    uid = user?.id ?? null;
     if (uid) setCurrentUserId(uid);
   } catch {}
   return uid;
