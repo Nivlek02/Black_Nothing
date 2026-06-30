@@ -865,40 +865,6 @@ export default function FinanzasPage() {
               <p className="text-xs text-muted-foreground mt-1">Saldo cuentas − Saldo TC − Pagos quincena</p>
             </CardContent>
           </Card>
-
-          {/* Quincena Summary */}
-          <Card className="card-metallic border-warning/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
-                <CalIcon className="h-4 w-4 text-warning" /> Pagos hasta el {nextQuincena.getDate()} de {nextQuincena.toLocaleDateString('es-CO', { month: 'long' })}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {quincenaPayments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Sin pagos pendientes en esta quincena 🎉</p>
-              ) : (
-                <>
-                  {quincenaPayments.map(p => (
-                    <div key={p.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Badge variant={daysUntil(p.due_date) <= 3 ? 'destructive' : daysUntil(p.due_date) <= 7 ? 'secondary' : 'outline'} className="text-[10px] shrink-0">
-                          {daysUntil(p.due_date) <= 0 ? 'Hoy' : daysUntil(p.due_date) === 1 ? 'Mañana' : `${daysUntil(p.due_date)}d`}
-                        </Badge>
-                        <span className="text-sm truncate">{p.name}</span>
-                        <span className="text-[10px] text-muted-foreground">{fmtShortDate(p.due_date)}</span>
-                      </div>
-                      <span className="font-mono-data text-sm text-warning shrink-0 ml-2">{fmt(p.amount)}</span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between items-center pt-2 border-t border-border">
-                    <span className="text-sm font-semibold text-foreground">Total quincena</span>
-                    <span className="font-mono-data text-lg font-bold text-warning">{fmt(quincenaTotal)}</span>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Upcoming payments preview - paginated by month */}
           {pendingByMonth.length > 0 && (
             <Card className="card-metallic">
