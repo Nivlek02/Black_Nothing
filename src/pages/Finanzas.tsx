@@ -372,6 +372,10 @@ export default function FinanzasPage() {
       setFormAccountId(bankAccounts[0]?.id ?? '');
       setFormDestAccountId(cashAccounts[0]?.id ?? '');
     }
+    if (type === 'consignar') {
+      setFormDestAccountId(cashAccounts[0]?.id ?? '');
+      setFormAccountId(bankAccounts[0]?.id ?? '');
+    }
     if (type === 'debtpayment') {
       setFormDebtPayAccountId(accounts[0]?.id ?? '');
     }
@@ -467,6 +471,36 @@ export default function FinanzasPage() {
     } catch (err) {
       console.error('Error al registrar transferencia:', err);
       toast({ title: 'Error al registrar la transferencia', description: err instanceof Error ? err.message : 'Ocurrió un error inesperado', variant: 'destructive' });
+    }
+  };
+  const handleSaveConsignar = async () => {
+    if (!formAmount || Number(formAmount) <= 0) return;
+    if (accounts.length > 0 && !formDestAccountId) { toast({ title: 'Selecciona la cuenta de efectivo origen', variant: 'destructive' }); return; }
+    if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona la cuenta de banco destino', variant: 'destructive' }); return; }
+    if (formDestAccountId === formAccountId) { toast({ title: 'La cuenta origen y destino deben ser diferentes', variant: 'destructive' }); return; }
+    if (!checkSufficient(formDestAccountId, Number(formAmount))) return;
+    try {
+      const destAccount = accounts.find(a => a.id === formAccountId);
+      await addExpense({
+        amount: Number(formAmount),
+        category: 'Consignación',
+        expense_type: 'occasional',
+        description: `Consignación a banco: ${formDescription || 'Sin descripción'}`,
+        payment_method: 'Efectivo',
+        account_id: formDestAccountId || null,
+      });
+      await addIncome({
+        amount: Number(formAmount),
+        category: 'Consignación',
+        description: `Consignación desde efectivo: ${formDescription || 'Sin descripción'}`,
+        payment_method: 'Transferencia',
+        account_id: formAccountId || null,
+      });
+      toast({ title: 'Consignación registrada' });
+      setDialog(null); loadAll();
+    } catch (err) {
+      console.error('Error al registrar consignación:', err);
+      toast({ title: 'Error al registrar la consignación', description: err instanceof Error ? err.message : 'Ocurrió un error inesperado', variant: 'destructive' });
     }
   };
   const handleSaveCCTx = async () => {
@@ -694,6 +728,7 @@ export default function FinanzasPage() {
     { label: 'Gasto', icon: ArrowDownCircle, color: 'text-red-400', action: () => openDialog('expense') },
     { label: 'Transferencia', icon: Send, color: 'text-blue-400', action: () => openDialog('transfer') },
     { label: 'Retiro', icon: Banknote, color: 'text-yellow-400', action: () => openDialog('withdrawal') },
+    { label: 'Consignar', icon: ArrowUpCircle, color: 'text-emerald-400', action: () => openDialog('consignar') },
     { label: 'TC', icon: CreditCard, color: 'text-accent', action: () => openDialog('cc', 'purchase') },
     { label: 'Pago TC', icon: Receipt, color: 'text-primary', action: () => openDialog('cc', 'payment') },
     { label: 'Deuda', icon: PiggyBank, color: 'text-orange-400', action: () => openDialog('debt') },
@@ -1563,6 +1598,36 @@ export default function FinanzasPage() {
             </div>
             <div><Label>Descripción</Label><Input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Opcional" /></div>
             <Button className="w-full" onClick={handleSaveWithdrawal} disabled={bankAccounts.length === 0 || cashAccounts.length === 0}>Transferir a Efectivo</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Consignar Dialog */}
+      <Dialog open={dialog === 'consignar'} onOpenChange={o => !o && setDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Consignar a Cuenta Bancaria</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Monto *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formAmount)} onChange={e => setFormAmount(parseInput(e.target.value))} /></div>
+            <div><Label>Efectivo (origen) *</Label>
+              {cashAccounts.length === 0 ? (
+                <p className="text-xs text-warning">No hay cuentas de efectivo. Crea una en la pestaña Cuentas.</p>
+              ) : (
+                <Select value={formDestAccountId} onValueChange={setFormDestAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar efectivo" /></SelectTrigger>
+                  <SelectContent>{cashAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
+            <div><Label>Cuenta destino (Banco) *</Label>
+              {bankAccounts.length === 0 ? (
+                <p className="text-xs text-warning">No hay cuentas de banco. Crea una en la pestaña Cuentas.</p>
+              ) : (
+                <Select value={formAccountId} onValueChange={setFormAccountId}><SelectTrigger><SelectValue placeholder="Seleccionar banco" /></SelectTrigger>
+                  <SelectContent>{bankAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {fmt(computeAccountBalance(a, incomes, expenses, withdrawals, ccTx, transfers))}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
+            <div><Label>Descripción</Label><Input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Opcional" /></div>
+            <Button className="w-full" onClick={handleSaveConsignar} disabled={cashAccounts.length === 0 || bankAccounts.length === 0}>Consignar</Button>
           </div>
         </DialogContent>
       </Dialog>
