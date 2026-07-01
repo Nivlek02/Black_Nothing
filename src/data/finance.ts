@@ -273,6 +273,10 @@ export async function deleteCCTransaction(id: string) {
   const { error } = await supabase.from('credit_card_transactions').delete().eq('id', id);
   if (error) throw error;
 }
+export async function updateCCTransaction(id: string, updates: Partial<CreditCardTransaction>) {
+  const { error } = await supabase.from('credit_card_transactions').update(updates).eq('id', id);
+  if (error) throw error;
+}
 
 export async function getDebts() {
   const { data } = await supabase.from('debts').select('*').order('created_at', { ascending: false });

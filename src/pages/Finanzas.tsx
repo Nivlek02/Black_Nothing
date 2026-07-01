@@ -26,7 +26,7 @@ import {
   getIncomes, addIncome, deleteIncome,
   getExpenses, addExpense, deleteExpense,
   getWithdrawals, addWithdrawal, deleteWithdrawal,
-  getCCTransactions, addCCTransaction, deleteCCTransaction,
+  getCCTransactions, addCCTransaction, deleteCCTransaction, updateCCTransaction,
   getDebts, addDebt, updateDebt, deleteDebt,
   getDebtPayments, addDebtPayment, getAllDebtPaymentsTotal, getTotalPaidUpcomingPayments, getTotalSavingsDeposits,
   getMovementHistory,
@@ -168,6 +168,7 @@ export default function FinanzasPage() {
   const [formTransferDescription, setFormTransferDescription] = useState('');
   // Edit upcoming payment
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [editingCCId, setEditingCCId] = useState<string | null>(null);
 
   // Pay upcoming payment dialog (select account to discount)
   const [payAccountDialog, setPayAccountDialog] = useState<UpcomingPayment | null>(null);
@@ -375,7 +376,7 @@ export default function FinanzasPage() {
     setFormSavMovId(''); setFormSavMovAmount(''); setFormSavMovType('deposit'); setFormSavMovNotes(''); setFormSavMovAccountId('');
     setFormCorteDate('');
     setFormTransferFromId(''); setFormTransferToId(''); setFormTransferAmount(''); setFormTransferDescription('');
-    setEditingPaymentId(null);
+    setEditingPaymentId(null); setEditingCCId(null);
   };
   const openDialog = (type: string, ccType?: string, savingsId?: string) => {
     resetForm();
@@ -530,7 +531,7 @@ export default function FinanzasPage() {
       if (formCcType === 'payment' && formCcPayMode !== 'total' && formCcPayMode !== 'single') return;
       const finalAmount = formCcType === 'payment' && (formCcPayMode === 'total' || formCcPayMode === 'single') ? payAmount : Number(formAmount);
       if (finalAmount <= 0) return;
-      if (formCcType === 'payment') {
+      if (formCcType === 'payment' && !editingCCId) {
         if (accounts.length > 0 && !formAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
         if (!checkSufficient(formAccountId, finalAmount)) return;
       }
@@ -539,26 +540,46 @@ export default function FinanzasPage() {
         : formCcType === 'payment' && formCcPayMode === 'total'
           ? 'Pago total TC'
           : formDescription;
-      await addCCTransaction({ amount: finalAmount, transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: desc, account_id: formCcType === 'payment' ? (formAccountId || null) : null });
-      toast({ title: formCcType === 'purchase' ? 'Compra TC registrada' : 'Pago TC registrado' });
+      if (editingCCId) {
+        await updateCCTransaction(editingCCId, { amount: finalAmount, category: formCategory || 'Otro', description: desc });
+        toast({ title: 'Movimiento TC actualizado' });
+      } else {
+        await addCCTransaction({ amount: finalAmount, transaction_type: formCcType as 'purchase' | 'payment', category: formCategory || 'Otro', description: desc, account_id: formCcType === 'payment' ? (formAccountId || null) : null });
+        toast({ title: formCcType === 'purchase' ? 'Compra TC registrada' : 'Pago TC registrado' });
+      }
       setDialog(null); loadAll();
     } catch (err) { console.error('Error al registrar movimiento TC:', err); toast({ title: 'Error al registrar movimiento TC', variant: 'destructive' }); }
+  };
+  const handleEditCCTx = (t: CreditCardTransaction) => {
+    setFormAmount(String(t.amount));
+    setFormCategory(t.category || '');
+    setFormDescription(t.description || '');
+    setFormCcType(t.transaction_type);
+    setEditingCCId(t.id);
+    setDialog('cc');
   };
   const handleSaveCorte = async () => {
     if (ccBalance <= 0) { toast({ title: 'No hay deuda pendiente para generar corte', variant: 'destructive' }); return; }
     if (!formCorteDate) { toast({ title: 'Selecciona la fecha de pago', variant: 'destructive' }); return; }
     try {
+      await addCCTransaction({
+        amount: ccBalance,
+        transaction_type: 'payment',
+        category: 'Crédito',
+        description: `Corte TC — ${new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })}`,
+        account_id: null,
+      });
       await addUpcomingPayment({
         name: `Corte TC — ${new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })}`,
         amount: ccBalance,
         due_date: formCorteDate,
         category: 'Crédito',
         is_paid: false,
-        notes: `Corte TC: ${fmt(ccPurchases)} en consumos, ${fmt(ccPayments)} pagado`,
+        notes: `Corte automático — deuda consolidada de ${fmt(ccBalance)}`,
         frequency: 'once',
         recurrence_end: null,
       });
-      toast({ title: 'Corte registrado como pago programado' });
+      toast({ title: 'Corte registrado: deuda TC consolidada como pago programado' });
       setDialog(null); loadAll();
     } catch (err) {
       console.error('Error al registrar corte:', err);
@@ -1422,7 +1443,12 @@ export default function FinanzasPage() {
                         <TableCell className="text-sm">{t.category}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{t.description}</TableCell>
                         <TableCell className={`text-right font-mono-data ${t.transaction_type === 'purchase' ? 'text-red-400' : 'text-green-400'}`}>{fmt(Number(t.amount))}</TableCell>
-                        <TableCell><Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'cc', id: t.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditCCTx(t)}><Edit className="h-4 w-4 text-primary" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'cc', id: t.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1727,7 +1753,7 @@ export default function FinanzasPage() {
       {/* Credit Card Dialog */}
       <Dialog open={dialog === 'cc'} onOpenChange={o => !o && setDialog(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>{formCcType === 'purchase' ? 'Registrar Compra con TC' : 'Registrar Pago de TC'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingCCId ? (formCcType === 'purchase' ? 'Editar Compra TC' : 'Editar Pago TC') : (formCcType === 'purchase' ? 'Registrar Compra con TC' : 'Registrar Pago de TC')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {formCcType === 'purchase' && (
               <>
