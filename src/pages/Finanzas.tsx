@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   DollarSign, TrendingUp, TrendingDown, CreditCard, Landmark, PiggyBank, Plus,
   Trash2, ArrowUpCircle, ArrowDownCircle, Banknote, Receipt, HandCoins, History,
-  Calendar as CalIcon, CheckCircle2, Clock, Wallet, Target, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Edit, Send
+  Calendar as CalIcon, CheckCircle2, Clock, Wallet, Target, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, Edit, Send, Pencil
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
@@ -169,6 +169,7 @@ export default function FinanzasPage() {
   // Edit upcoming payment
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
   const [editingCCId, setEditingCCId] = useState<string | null>(null);
+  const [editingDebtId, setEditingDebtId] = useState<string | null>(null);
 
   // Pay upcoming payment dialog (select account to discount)
   const [payAccountDialog, setPayAccountDialog] = useState<UpcomingPayment | null>(null);
@@ -376,7 +377,7 @@ export default function FinanzasPage() {
     setFormSavMovId(''); setFormSavMovAmount(''); setFormSavMovType('deposit'); setFormSavMovNotes(''); setFormSavMovAccountId('');
     setFormCorteDate('');
     setFormTransferFromId(''); setFormTransferToId(''); setFormTransferAmount(''); setFormTransferDescription('');
-    setEditingPaymentId(null); setEditingCCId(null);
+    setEditingPaymentId(null); setEditingCCId(null); setEditingDebtId(null);
   };
   const openDialog = (type: string, ccType?: string, savingsId?: string) => {
     resetForm();
@@ -589,10 +590,15 @@ export default function FinanzasPage() {
   const handleSaveDebt = async () => {
     if (!formDebtName || !formDebtTotal || Number(formDebtTotal) <= 0) return;
     try {
-      await addDebt({ name: formDebtName, total_amount: Number(formDebtTotal), remaining_amount: Number(formDebtTotal), start_date: formDebtStart, due_date: formDebtDue || formDebtStart, status: 'active', notes: formDebtNotes });
-      toast({ title: 'Deuda registrada' });
+      if (editingDebtId) {
+        await updateDebt(editingDebtId, { name: formDebtName, total_amount: Number(formDebtTotal), start_date: formDebtStart, due_date: formDebtDue || formDebtStart, notes: formDebtNotes });
+        toast({ title: 'Deuda actualizada' });
+      } else {
+        await addDebt({ name: formDebtName, total_amount: Number(formDebtTotal), remaining_amount: Number(formDebtTotal), start_date: formDebtStart, due_date: formDebtDue || formDebtStart, status: 'active', notes: formDebtNotes });
+        toast({ title: 'Deuda registrada' });
+      }
       setDialog(null); loadAll();
-    } catch (err) { console.error('Error al registrar deuda:', err); toast({ title: 'Error al registrar deuda', variant: 'destructive' }); }
+    } catch (err) { console.error('Error al guardar deuda:', err); toast({ title: 'Error al guardar deuda', variant: 'destructive' }); }
   };
   const handleSaveDebtPayment = async () => {
     if (!formDebtPayAmount || Number(formDebtPayAmount) <= 0 || !formDebtPayId) return;
@@ -1483,6 +1489,7 @@ export default function FinanzasPage() {
                         <Badge variant={d.status === 'paid' ? 'default' : d.status === 'overdue' ? 'destructive' : 'secondary'}>
                           {d.status === 'paid' ? 'Pagada' : d.status === 'overdue' ? 'Vencida' : 'Activa'}
                         </Badge>
+                        <Button variant="ghost" size="icon" onClick={() => { setEditingDebtId(d.id); setFormDebtName(d.name); setFormDebtTotal(String(d.total_amount)); setFormDebtStart(d.start_date); setFormDebtDue(d.due_date); setFormDebtNotes(d.notes || ''); setDialog('debt'); }}><Pencil className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ type: 'debt', id: d.id })}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </div>
@@ -1844,7 +1851,7 @@ export default function FinanzasPage() {
       {/* Debt Dialog */}
       <Dialog open={dialog === 'debt'} onOpenChange={o => !o && setDialog(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Registrar Deuda</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingDebtId ? 'Editar Deuda' : 'Registrar Deuda'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Nombre / Concepto *</Label><Input value={formDebtName} onChange={e => setFormDebtName(e.target.value)} placeholder="Ej: Préstamo personal" /></div>
             <div><Label>Monto total *</Label><Input type="text" inputMode="numeric" placeholder="0" value={fmtInput(formDebtTotal)} onChange={e => setFormDebtTotal(parseInput(e.target.value))} /></div>
@@ -1853,7 +1860,7 @@ export default function FinanzasPage() {
               <div><Label>Fecha límite</Label><Input type="date" value={formDebtDue} onChange={e => setFormDebtDue(e.target.value)} /></div>
             </div>
             <div><Label>Notas</Label><Textarea value={formDebtNotes} onChange={e => setFormDebtNotes(e.target.value)} placeholder="Opcional" /></div>
-            <Button className="w-full" onClick={handleSaveDebt}>Guardar Deuda</Button>
+            <Button className="w-full" onClick={handleSaveDebt}>{editingDebtId ? 'Guardar Cambios' : 'Guardar Deuda'}</Button>
           </div>
         </DialogContent>
       </Dialog>
