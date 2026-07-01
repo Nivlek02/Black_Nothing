@@ -67,6 +67,16 @@ function daysUntil(dateStr: string) {
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function advanceDate(currentDate: string, frequency: string): string {
+  const d = new Date(currentDate + 'T12:00:00');
+  if (frequency === 'monthly') {
+    d.setMonth(d.getMonth() + 1);
+  } else {
+    d.setDate(d.getDate() + 15);
+  }
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function MobileTable({ children }: { children: React.ReactNode }) {
   return <div className="w-full overflow-x-auto">{children}</div>;
 }
@@ -149,6 +159,8 @@ export default function FinanzasPage() {
   const [formSavMovType, setFormSavMovType] = useState('deposit');
   const [formSavMovNotes, setFormSavMovNotes] = useState('');
   const [formSavMovAccountId, setFormSavMovAccountId] = useState<string>('');
+  // Corte form
+  const [formCorteDate, setFormCorteDate] = useState('');
   // Bank transfer form
   const [formTransferFromId, setFormTransferFromId] = useState<string>('');
   const [formTransferToId, setFormTransferToId] = useState<string>('');
@@ -361,6 +373,7 @@ export default function FinanzasPage() {
     setFormUpFrequency('once'); setFormUpEndDate('');
     setFormSavName(''); setFormSavTarget(''); setFormSavNotes('');
     setFormSavMovId(''); setFormSavMovAmount(''); setFormSavMovType('deposit'); setFormSavMovNotes(''); setFormSavMovAccountId('');
+    setFormCorteDate('');
     setFormTransferFromId(''); setFormTransferToId(''); setFormTransferAmount(''); setFormTransferDescription('');
     setEditingPaymentId(null);
   };
@@ -381,6 +394,9 @@ export default function FinanzasPage() {
     }
     if (type === 'savingsmovement') {
       setFormSavMovAccountId(accounts[0]?.id ?? '');
+    }
+    if (type === 'corte') {
+      setFormCorteDate(nextPayDate.toISOString().split('T')[0]);
     }
     setDialog(type);
   };
@@ -528,6 +544,27 @@ export default function FinanzasPage() {
       setDialog(null); loadAll();
     } catch (err) { console.error('Error al registrar movimiento TC:', err); toast({ title: 'Error al registrar movimiento TC', variant: 'destructive' }); }
   };
+  const handleSaveCorte = async () => {
+    if (ccBalance <= 0) { toast({ title: 'No hay deuda pendiente para generar corte', variant: 'destructive' }); return; }
+    if (!formCorteDate) { toast({ title: 'Selecciona la fecha de pago', variant: 'destructive' }); return; }
+    try {
+      await addUpcomingPayment({
+        name: `Corte TC — ${new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })}`,
+        amount: ccBalance,
+        due_date: formCorteDate,
+        category: 'Crédito',
+        is_paid: false,
+        notes: `Corte TC: ${fmt(ccPurchases)} en consumos, ${fmt(ccPayments)} pagado`,
+        frequency: 'once',
+        recurrence_end: null,
+      });
+      toast({ title: 'Corte registrado como pago programado' });
+      setDialog(null); loadAll();
+    } catch (err) {
+      console.error('Error al registrar corte:', err);
+      toast({ title: 'Error al registrar el corte', variant: 'destructive' });
+    }
+  };
   const handleSaveDebt = async () => {
     if (!formDebtName || !formDebtTotal || Number(formDebtTotal) <= 0) return;
     try {
@@ -573,8 +610,25 @@ export default function FinanzasPage() {
   };
   const handleTogglePaid = async (p: UpcomingPayment) => {
     try {
-      await updateUpcomingPayment(p.id, { is_paid: !p.is_paid });
-      toast({ title: p.is_paid ? 'Marcado como pendiente' : 'Marcado como pagado' });
+      if (p.frequency !== 'once' && !p.is_paid) {
+        // Recurring payment being marked as paid → advance to next period
+        const nextDate = advanceDate(p.due_date, p.frequency);
+        const endDate = p.recurrence_end || '9999-12-31';
+        if (nextDate > endDate) {
+          // Past recurrence end, just mark as paid once
+          await updateUpcomingPayment(p.id, { is_paid: true });
+        } else {
+          await updateUpcomingPayment(p.id, { due_date: nextDate, is_paid: false });
+        }
+        toast({ title: 'Pagado, siguiente período generado' });
+      } else if (p.frequency !== 'once' && p.is_paid) {
+        // Un-marking a recurring payment: revert to previous period
+        await updateUpcomingPayment(p.id, { is_paid: false });
+        toast({ title: 'Marcado como pendiente' });
+      } else {
+        await updateUpcomingPayment(p.id, { is_paid: !p.is_paid });
+        toast({ title: p.is_paid ? 'Marcado como pendiente' : 'Marcado como pagado' });
+      }
       loadAll();
     } catch (err) { console.error('Error al actualizar pago:', err); toast({ title: 'Error al actualizar', variant: 'destructive' }); }
   };
@@ -589,7 +643,18 @@ export default function FinanzasPage() {
     if (accounts.length > 0 && !formPayAccountId) { toast({ title: 'Selecciona una cuenta', variant: 'destructive' }); return; }
     if (!checkSufficient(formPayAccountId, amount)) return;
     try {
-      await updateUpcomingPayment(p.id, { is_paid: true });
+      if (p.frequency !== 'once') {
+        // Recurring payment: advance to next period
+        const nextDate = advanceDate(p.due_date, p.frequency);
+        const endDate = p.recurrence_end || '9999-12-31';
+        if (nextDate > endDate) {
+          await updateUpcomingPayment(p.id, { is_paid: true });
+        } else {
+          await updateUpcomingPayment(p.id, { due_date: nextDate, is_paid: false });
+        }
+      } else {
+        await updateUpcomingPayment(p.id, { is_paid: true });
+      }
       await addExpense({
         amount,
         category: p.category || 'Otro',
@@ -1339,6 +1404,7 @@ export default function FinanzasPage() {
             <h2 className="text-base sm:text-lg font-semibold text-foreground">Movimientos TC</h2>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" className="text-xs sm:text-sm" onClick={() => openDialog('cc', 'payment')}>Pago</Button>
+              <Button size="sm" variant="outline" className="text-xs sm:text-sm text-warning border-warning/30 hover:bg-warning/10" onClick={() => openDialog('corte')}><CalIcon className="h-4 w-4 mr-1" /> Corte</Button>
               <Button size="sm" className="text-xs sm:text-sm" onClick={() => openDialog('cc', 'purchase')}><Plus className="h-4 w-4 mr-1" /> Compra</Button>
             </div>
           </div>
@@ -1628,6 +1694,32 @@ export default function FinanzasPage() {
             </div>
             <div><Label>Descripción</Label><Input value={formDescription} onChange={e => setFormDescription(e.target.value)} placeholder="Opcional" /></div>
             <Button className="w-full" onClick={handleSaveConsignar} disabled={cashAccounts.length === 0 || bankAccounts.length === 0}>Consignar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Corte Dialog */}
+      <Dialog open={dialog === 'corte'} onOpenChange={o => !o && setDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Crear Corte de Tarjeta</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-lg bg-muted/30 p-3 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Deuda total TC</span>
+                <span className="font-mono-data text-lg font-bold text-warning">{fmt(ccBalance)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Consumos</span>
+                <span className="font-mono-data text-sm text-red-400">{fmt(ccPurchases)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Pagos realizados</span>
+                <span className="font-mono-data text-sm text-green-400">{fmt(ccPayments)}</span>
+              </div>
+            </div>
+            <div><Label>Fecha de pago *</Label><Input type="date" value={formCorteDate} onChange={e => setFormCorteDate(e.target.value)} /></div>
+            <p className="text-xs text-muted-foreground">💡 Se creará un pago programado con la deuda total de la tarjeta.</p>
+            <Button className="w-full" onClick={handleSaveCorte} disabled={ccBalance <= 0 || !formCorteDate}>Registrar Corte</Button>
           </div>
         </DialogContent>
       </Dialog>
